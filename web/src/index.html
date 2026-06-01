@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>커뮤니티</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-inner">
+        <div class="logo" onclick="showList()">
+          <span class="logo-bracket">[</span>커뮤니티<span class="logo-bracket"
+            >]</span
+          >
+        </div>
+        <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
+      </div>
+    </header>
+
+    <main id="view-list">
+      <div class="container">
+        <div class="page-title">
+          <h2>전체 글 <span id="post-count" class="count-badge">0</span></h2>
+        </div>
+        <div id="posts-container">
+          <div class="loading">불러오는 중...</div>
+        </div>
+      </div>
+    </main>
+
+    <main id="view-write" class="hidden">
+      <div class="container narrow">
+        <div class="page-title">
+          <h2>새 글 작성</h2>
+          <button class="btn-back" onclick="showList()">← 목록으로</button>
+        </div>
+        <div class="form-card">
+          <div class="form-group">
+            <label>닉네임</label>
+            <input type="text" id="write-username" placeholder="닉네임 입력" />
+          </div>
+          <div class="form-group">
+            <label>제목</label>
+            <input
+              type="text"
+              id="write-title"
+              placeholder="제목을 입력하세요"
+            />
+          </div>
+          <div class="form-group">
+            <label>내용</label>
+            <textarea
+              id="write-content"
+              rows="8"
+              placeholder="내용을 입력하세요"
+            ></textarea>
+          </div>
+          <div class="form-actions">
+            <button class="btn-cancel" onclick="showList()">취소</button>
+            <button class="btn-submit" onclick="submitPost()">게시하기</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <main id="view-detail" class="hidden">
+      <div class="container narrow">
+        <button class="btn-back" onclick="showList()">← 목록으로</button>
+        <div id="post-detail"></div>
+        <div class="comment-section">
+          <h3 class="comment-title">
+            댓글 <span id="comment-count" class="count-badge">0</span>
+          </h3>
+          <div id="comments-container"></div>
+          <div class="comment-form">
+            <div class="comment-inputs">
+              <input type="text" id="comment-username" placeholder="닉네임" />
+              <input
+                type="text"
+                id="comment-content"
+                placeholder="댓글을 입력하세요"
+                onkeydown="if (event.key === 'Enter') submitComment();"
+              />
+            </div>
+            <button class="btn-submit small" onclick="submitComment()">
+              등록
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
