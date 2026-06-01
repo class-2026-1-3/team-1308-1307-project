@@ -3,6 +3,7 @@ USE study;
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -11,6 +12,7 @@ CREATE TABLE IF NOT EXISTS posts (
     user_id INT,
     title VARCHAR(200) NOT NULL,
     content TEXT NOT NULL,
+    password_hash VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS comments (
     post_id INT NOT NULL,
     user_id INT,
     content TEXT NOT NULL,
+    password_hash VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL

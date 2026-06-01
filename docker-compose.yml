@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   db:
     build: ./mysql
@@ -28,6 +26,8 @@ services:
       - DB_USER=root
       - DB_PASSWORD=13071308
       - DB_NAME=study
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
 
 volumes:
   db_data:
