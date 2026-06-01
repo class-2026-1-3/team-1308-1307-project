@@ -4,8 +4,14 @@ const path = require("path");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*", methods: ["GET", "POST"] }
+});
 const port = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "teamP-community-secret-key-2026";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
@@ -34,6 +40,7 @@ db.getConnection((err, conn) => {
     runMigration();
     seedAdmin();
     seedCategories();
+    setTimeout(seedNotices, 500);
   }
 });
 
@@ -42,6 +49,10 @@ function runMigration() {
   const migrations = [
     "CREATE TABLE IF NOT EXISTS categories (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(50) NOT NULL, slug VARCHAR(50) NOT NULL UNIQUE)",
     "CREATE TABLE IF NOT EXISTS post_likes (id INT AUTO_INCREMENT PRIMARY KEY, post_id INT NOT NULL, user_id INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY unique_like (post_id, user_id), FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS follows (id INT AUTO_INCREMENT PRIMARY KEY, follower_id INT NOT NULL, following_id INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY unique_follow (follower_id, following_id), FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS chat_rooms (id INT AUTO_INCREMENT PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS chat_room_members (id INT AUTO_INCREMENT PRIMARY KEY, room_id INT NOT NULL, user_id INT NOT NULL, UNIQUE KEY unique_member (room_id, user_id), FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS chat_messages (id INT AUTO_INCREMENT PRIMARY KEY, room_id INT NOT NULL, user_id INT NOT NULL, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
     { table: "posts", col: "category_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL" },
     { table: "posts", col: "views", def: "INT DEFAULT 0" },
     { table: "posts", col: "is_pinned", def: "TINYINT(1) DEFAULT 0" },
@@ -99,6 +110,32 @@ function seedCategories() {
   ];
   cats.forEach(([id, name, slug]) => {
     db.query("INSERT IGNORE INTO categories (id, name, slug) VALUES (?, ?, ?)", [id, name, slug]);
+  });
+}
+
+function seedNotices() {
+  db.query("SELECT id FROM users WHERE username = ?", [ADMIN_USERNAME], (err, users) => {
+    if (err || users.length === 0) return setTimeout(seedNotices, 1000);
+    const adminId = users[0].id;
+    const notices = [
+      { category_id: 1, slug: "free", title: "커뮤니티 이용 안내",
+        content: "## 환영합니다! 👋\n\n**자유 게시판**은 커뮤니티 회원이라면 누구나 자유롭게 이야기를 나눌 수 있는 공간입니다.\n\n### 📋 기본 규칙\n\n1. **존중과 예의** – 모든 회원을 존중하고 배려해주세요.\n2. **욕설/비방 금지** – 타인에 대한 모욕적 표현은 삼가주세요.\n3. **도배 금지** – 동일한 내용의 반복 게시를 자제해주세요.\n4. **홍보/광고 금지** – 무단 홍보 글은 삭제될 수 있습니다.\n\n---\n\n> 함께 만들어가는 커뮤니티입니다. 건전한 토론과 즐거운 대화 부탁드립니다 😊" },
+      { category_id: 2, slug: "question", title: "질문 게시판 이용 가이드",
+        content: "## 🙋 질문하기 전에 확인하세요!\n\n**질문 게시판**은 궁금한 점을 자유롭게 질문하고 답변을 받는 공간입니다.\n\n### 💡 좋은 질문하는 법\n\n1. **검색 먼저** – 이미 같은 질문이 있는지 검색해보세요.\n2. **구체적으로** – 상황, 시도한 방법, 에러 메시지를 상세히 적어주세요.\n3. **제목을 명확하게** – `도와주세요`보다 `Node.js MySQL 연결 오류`가 좋습니다.\n4. **해결 후 공유** – 문제를 해결했다면 답변을 남겨주세요!\n\n### ✅ 예시\n\n```\n질문: Express 서버에서 CORS 에러가 발생합니다.\n\n상황: React 앱에서 localhost:3001 Express 서버로 요청 시\n에러 메시지: Access-Control-Allow-Origin\n\n시도: cors() 미들웨어를 추가했지만 여전히 에러가 납니다.\n```" },
+      { category_id: 3, slug: "info", title: "정보 게시판 이용 안내",
+        content: "## 📢 유용한 정보를 공유해주세요!\n\n**정보 게시판**은 개발 팁, 기술 뉴스, 유틸리티 소개 등 유익한 정보를 공유하는 공간입니다.\n\n### 📝 정보 공유 가이드\n\n1. **출처 표기** – 인용이나 참고 자료는 반드시 출처를 남겨주세요.\n2. **검증된 정보** – 사실 여부가 확인된 정보를 공유해주세요.\n3. **카테고리 활용** – 관련 카테고리를 선택해주세요.\n4. **링크 삽입** – 참고 링크가 있다면 함께 첨부해주세요.\n\n> 예: `[MDN Web Docs](https://developer.mozilla.org/ko/)` → [MDN Web Docs](https://developer.mozilla.org/ko/)\n\n### 🖼 이미지 첨부\n\n마크다운 문법으로 이미지를 삽입할 수 있습니다:\n\n```markdown\n![설명](이미지_URL)\n```" },
+      { category_id: 4, slug: "chat", title: "잡담 게시판 이용 안내",
+        content: "## 🗣 자유롭게 이야기 나눠요!\n\n**잡담 게시판**은 일상, 취미, 가벼운 이야기를 자유롭게 나누는 공간입니다.\n\n### 🎯 이런 이야기 좋아요!\n\n- 일상 생활 이야기\n- 개발자 밈 & 유머 😄\n- IT 업계 잡담\n- 음악, 영화, 게임 등 취미 이야기\n- 사는 이야기\n\n### ⚠️ 주의사항\n\n- 정치/종교 등 민감한 주제는 자제해주세요.\n- 타인에게 불쾌감을 줄 수 있는 내용은 삼가주세요.\n- 과도한 친목/구인 활동은 지양해주세요.\n\n---\n\n**편하게 이야기 나누며 쉬어가는 공간입니다!** ☕" },
+    ];
+    notices.forEach(n => {
+      db.query("SELECT id FROM posts WHERE title = ? AND user_id = ?", [n.title, adminId], (err, posts) => {
+        if (err || posts.length > 0) return;
+        db.query("INSERT INTO posts (user_id, title, content, category_id, is_pinned) VALUES (?, ?, ?, ?, 1)",
+          [adminId, n.title, n.content, n.category_id], (err) => {
+            if (!err) console.log(`공지 등록 완료: ${n.title}`);
+          });
+      });
+    });
   });
 }
 
@@ -471,7 +508,7 @@ app.get("/api/users/:username/posts", (req, res) => {
   });
 });
 
-app.get("/api/users/:username", (req, res) => {
+app.get("/api/users/:username", authenticate, (req, res) => {
   db.query(
     "SELECT id, username, created_at FROM users WHERE username = ?",
     [req.params.username],
@@ -479,20 +516,54 @@ app.get("/api/users/:username", (req, res) => {
       if (err) return res.status(500).json({ error: err.message });
       if (users.length === 0)
         return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+      const targetId = users[0].id;
       db.query(
         "SELECT COUNT(*) AS post_count FROM posts WHERE user_id = ?",
-        [users[0].id], (err, postResult) => {
+        [targetId], (err, postResult) => {
           if (err) return res.status(500).json({ error: err.message });
           db.query(
             "SELECT COUNT(*) AS comment_count FROM comments WHERE user_id = ?",
-            [users[0].id], (err, commentResult) => {
+            [targetId], (err, commentResult) => {
               if (err) return res.status(500).json({ error: err.message });
-              res.json({
-                ...users[0],
-                post_count: postResult[0].post_count,
-                comment_count: commentResult[0].comment_count,
-                is_admin: isAdminUser(users[0].username),
-              });
+              db.query(
+                "SELECT COUNT(*) AS follower_count FROM follows WHERE following_id = ?",
+                [targetId], (err, followerResult) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  db.query(
+                    "SELECT COUNT(*) AS following_count FROM follows WHERE follower_id = ?",
+                    [targetId], (err, followingResult) => {
+                      if (err) return res.status(500).json({ error: err.message });
+                      let is_following = false;
+                      if (req.user) {
+                        db.query(
+                          "SELECT id FROM follows WHERE follower_id = ? AND following_id = ?",
+                          [req.user.id, targetId],
+                          (err, follows) => {
+                            if (!err) is_following = follows.length > 0;
+                            res.json({
+                              ...users[0],
+                              post_count: postResult[0].post_count,
+                              comment_count: commentResult[0].comment_count,
+                              follower_count: followerResult[0].follower_count,
+                              following_count: followingResult[0].following_count,
+                              is_admin: isAdminUser(users[0].username),
+                              is_following,
+                            });
+                          }
+                        );
+                      } else {
+                        res.json({
+                          ...users[0],
+                          post_count: postResult[0].post_count,
+                          comment_count: commentResult[0].comment_count,
+                          follower_count: followerResult[0].follower_count,
+                          following_count: followingResult[0].following_count,
+                          is_admin: isAdminUser(users[0].username),
+                          is_following: false,
+                        });
+                      }
+                    });
+                });
             });
         });
     }
@@ -611,6 +682,31 @@ app.delete("/api/comments/:id", authenticate, (req, res) => {
   );
 });
 
+app.post("/api/users/:username/follow", authenticate, requireAuth, (req, res) => {
+  if (req.user.username === req.params.username)
+    return res.status(400).json({ error: "자신을 팔로우할 수 없습니다" });
+  db.query("SELECT id FROM users WHERE username = ?", [req.params.username], (err, users) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (users.length === 0)
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+    const targetId = users[0].id;
+    db.query("SELECT id FROM follows WHERE follower_id = ? AND following_id = ?", [req.user.id, targetId], (err, follows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (follows.length > 0) {
+        db.query("DELETE FROM follows WHERE follower_id = ? AND following_id = ?", [req.user.id, targetId], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ following: false });
+        });
+      } else {
+        db.query("INSERT INTO follows (follower_id, following_id) VALUES (?, ?)", [req.user.id, targetId], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ following: true });
+        });
+      }
+    });
+  });
+});
+
 app.delete("/api/users/:username", authenticate, requireAuth, (req, res) => {
   if (isAdminUser(req.user.username))
     return res.status(403).json({ error: "관리자 계정은 탈퇴할 수 없습니다" });
@@ -623,12 +719,152 @@ app.delete("/api/users/:username", authenticate, requireAuth, (req, res) => {
   });
 });
 
+app.post("/api/chat/rooms/:username", authenticate, requireAuth, (req, res) => {
+  db.query("SELECT id FROM users WHERE username = ?", [req.params.username], (err, users) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (users.length === 0) return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+    const otherId = users[0].id;
+    if (req.user.id === otherId) return res.status(400).json({ error: "자기 자신과 채팅할 수 없습니다" });
+
+    db.query(
+      `SELECT r.id FROM chat_rooms r
+       INNER JOIN chat_room_members m1 ON r.id = m1.room_id AND m1.user_id = ?
+       INNER JOIN chat_room_members m2 ON r.id = m2.room_id AND m2.user_id = ?
+       LIMIT 1`,
+      [req.user.id, otherId],
+      (err, rooms) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (rooms.length > 0) return res.json({ roomId: rooms[0].id });
+
+        db.query("INSERT INTO chat_rooms () VALUES ()", (err, result) => {
+          if (err) return res.status(500).json({ error: err.message });
+          const roomId = result.insertId;
+          db.query("INSERT INTO chat_room_members (room_id, user_id) VALUES (?,?), (?,?)",
+            [roomId, req.user.id, roomId, otherId], (err) => {
+              if (err) return res.status(500).json({ error: err.message });
+              res.json({ roomId });
+            });
+        });
+      }
+    );
+  });
+});
+
+app.get("/api/chat/rooms", authenticate, requireAuth, (req, res) => {
+  db.query(
+    `SELECT r.id AS room_id, r.created_at,
+       (SELECT content FROM chat_messages WHERE room_id = r.id ORDER BY created_at DESC LIMIT 1) AS last_message,
+       (SELECT created_at FROM chat_messages WHERE room_id = r.id ORDER BY created_at DESC LIMIT 1) AS last_message_at,
+       (SELECT COUNT(*) FROM chat_messages WHERE room_id = r.id) AS message_count,
+       (SELECT u.username FROM chat_room_members m JOIN users u ON m.user_id = u.id WHERE m.room_id = r.id AND m.user_id != ?) AS other_username
+     FROM chat_rooms r
+     INNER JOIN chat_room_members m ON r.id = m.room_id AND m.user_id = ?
+     ORDER BY last_message_at DESC`,
+    [req.user.id, req.user.id],
+    (err, rooms) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rooms);
+    }
+  );
+});
+
+app.get("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const offset = (page - 1) * limit;
+
+  db.query(
+    "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
+    [req.params.roomId, req.user.id],
+    (err, members) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (members.length === 0) return res.status(403).json({ error: "채팅방 멤버가 아닙니다" });
+
+      db.query(
+        "SELECT COUNT(*) AS total FROM chat_messages WHERE room_id = ?",
+        [req.params.roomId], (err, countResult) => {
+          if (err) return res.status(500).json({ error: err.message });
+          const total = countResult[0].total;
+
+          db.query(
+            `SELECT m.id, m.content, m.created_at, m.user_id, u.username
+             FROM chat_messages m LEFT JOIN users u ON m.user_id = u.id
+             WHERE m.room_id = ?
+             ORDER BY m.created_at DESC
+             LIMIT ? OFFSET ?`,
+            [req.params.roomId, limit, offset],
+            (err, messages) => {
+              if (err) return res.status(500).json({ error: err.message });
+              res.json({ messages, total, page, totalPages: Math.ceil(total / limit) || 1 });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+app.post("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, res) => {
+  const { content } = req.body;
+  if (!content || !content.trim())
+    return res.status(400).json({ error: "메시지를 입력하세요" });
+
+  db.query(
+    "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
+    [req.params.roomId, req.user.id],
+    (err, members) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (members.length === 0) return res.status(403).json({ error: "채팅방 멤버가 아닙니다" });
+
+      db.query(
+        "INSERT INTO chat_messages (room_id, user_id, content) VALUES (?, ?, ?)",
+        [req.params.roomId, req.user.id, content.trim()],
+        (err, result) => {
+          if (err) return res.status(500).json({ error: err.message });
+          const newMsg = { id: result.insertId, content: content.trim(), user_id: req.user.id, username: req.user.username, created_at: new Date() };
+          io.to(`room:${req.params.roomId}`).emit("new-message", newMsg);
+          res.status(201).json(newMsg);
+        }
+      );
+    }
+  );
+});
+
+io.use((socket, next) => {
+  const token = socket.handshake.query.token;
+  if (!token) return next(new Error("인증 토큰이 없습니다"));
+  try {
+    socket.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    next(new Error("인증 실패"));
+  }
+});
+
+io.on("connection", (socket) => {
+  socket.on("join-room", (roomId) => {
+    db.query(
+      "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
+      [roomId, socket.user.id],
+      (err, members) => {
+        if (!err && members.length > 0) {
+          socket.join(`room:${roomId}`);
+        }
+      }
+    );
+  });
+
+  socket.on("leave-room", (roomId) => {
+    socket.leave(`room:${roomId}`);
+  });
+});
+
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
   res.status(500).json({ error: "서버 오류가 발생했습니다." });
 });
 
-app.listen(port, "0.0.0.0", () => {
+server.listen(port, "0.0.0.0", () => {
   console.log(`서버 실행 중: http://0.0.0.0:${port}`);
   console.log(`관리자 계정: ${ADMIN_USERNAME}`);
 });

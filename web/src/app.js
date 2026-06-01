@@ -6,6 +6,7 @@ let currentCategory = "";
 let currentUser = null;
 let currentProfileUsername = "";
 let dialogResolve = null;
+let chatSocket = null;
 
 function getToken() {
   return localStorage.getItem("token");
@@ -31,14 +32,16 @@ function updateHeader() {
   const userArea = document.getElementById("header-user");
   const usernameEl = document.getElementById("header-username");
   const loginBtn = document.getElementById("btn-login");
-  const logoutBtn = document.getElementById("btn-logout");
+  const chatBtn = document.getElementById("btn-chat");
   if (currentUser) {
     usernameEl.textContent = currentUser.username;
     userArea.classList.remove("hidden");
     loginBtn.classList.add("hidden");
+    chatBtn.classList.remove("hidden");
   } else {
     userArea.classList.add("hidden");
     loginBtn.classList.remove("hidden");
+    chatBtn.classList.add("hidden");
   }
   const detailView = document.getElementById("view-detail");
   if (detailView && !detailView.classList.contains("hidden")) {
@@ -48,6 +51,23 @@ function updateHeader() {
 
 function updateFormUsername() {
   // no-op: guest fields removed
+}
+
+function insertMd(textareaId, before, after) {
+  const ta = document.getElementById(textareaId);
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const text = ta.value;
+  const selected = text.substring(start, end);
+  ta.value = text.substring(0, start) + before + selected + after + text.substring(end);
+  ta.focus();
+  const pos = start + before.length + (after ? 0 : 0);
+  ta.setSelectionRange(start + before.length, start + before.length + selected.length);
+}
+
+function renderMd(text) {
+  if (typeof marked === "undefined" || typeof DOMPurify === "undefined") return escHtml(text);
+  return DOMPurify.sanitize(marked.parse(text));
 }
 
 function toggleCommentForm() {
@@ -235,6 +255,7 @@ function signup() {
 }
 
 function logout() {
+  if (chatSocket) { chatSocket.disconnect(); chatSocket = null; }
   currentUser = null; setToken(null); updateHeader(); updateFormUsername();
 }
 
@@ -287,6 +308,7 @@ function showList() {
   document.getElementById("view-list").classList.remove("hidden");
   renderCategoryTabs();
   loadPosts();
+  updateHash();
 }
 
 function showWrite() {
@@ -296,6 +318,7 @@ function showWrite() {
   document.getElementById("write-title").value = "";
   document.getElementById("write-content").value = "";
   loadCategories("write-category");
+  updateHash();
 }
 
 function showDetail(id) {
@@ -304,12 +327,14 @@ function showDetail(id) {
   document.getElementById("view-detail").classList.remove("hidden");
   toggleCommentForm();
   loadPost(id);
+  updateHash();
 }
 
 function showEdit(id) {
   currentPostId = id;
   hideAllViews();
   document.getElementById("view-edit").classList.remove("hidden");
+  updateHash();
   fetch(`/api/posts/${id}`).then(r => r.json()).then(post => {
     document.getElementById("edit-title").value = post.title;
     document.getElementById("edit-content").value = post.content;
@@ -327,10 +352,11 @@ function showProfile(username) {
   hideAllViews();
   document.getElementById("view-profile").classList.remove("hidden");
   loadProfile(username);
+  updateHash();
 }
 
 function hideAllViews() {
-  ["view-list", "view-write", "view-detail", "view-edit", "view-profile"].forEach(id => {
+  ["view-list", "view-write", "view-detail", "view-edit", "view-profile", "view-chat", "view-chat-room"].forEach(id => {
     document.getElementById(id).classList.add("hidden");
   });
 }
@@ -376,7 +402,7 @@ function loadPosts(page) {
     document.getElementById("post-count").textContent = data.total;
     if (data.posts.length === 0) {
       container.innerHTML = '<div class="empty">게시글이 없습니다.</div>';
-      return;
+      updateHash(); return;
     }
     container.innerHTML = data.posts.map(post => `
       <div class="post-item" onclick="showDetail(${post.id})">
@@ -400,6 +426,7 @@ function loadPosts(page) {
       </div>
     `).join("");
     renderPagination(data);
+    updateHash();
   }).catch(() => { container.innerHTML = '<div class="empty error-msg">게시글을 불러오지 못했습니다.</div>'; });
 }
 
@@ -445,7 +472,7 @@ function loadPost(id) {
           &nbsp;·&nbsp;${formatDate(post.created_at)}
           &nbsp;·&nbsp;조회 ${post.views}
         </div>
-        <div class="post-card-content">${escHtml(post.content)}</div>
+        <div class="post-card-content md-content">${renderMd(post.content)}</div>
       </div>
     `;
 
@@ -615,7 +642,12 @@ function loadProfile(username) {
 
   const isMyPage = currentUser && currentUser.username === username;
 
-  fetch(`/api/users/${encodeURIComponent(username)}`).then(r => r.json()).then(user => {
+  authFetch(`/api/users/${encodeURIComponent(username)}`).then(r => r.json()).then(user => {
+    const actionBtns = !isMyPage && currentUser
+      ? `<button class="btn-follow ${user.is_following ? 'following' : ''}" onclick="toggleFollow('${escHtml(user.username)}')">${user.is_following ? '팔로잉' : '팔로우'}</button>
+         <button class="btn-chat-action" onclick="startChat('${escHtml(user.username)}')">💬 메시지</button>`
+      : "";
+
     header.innerHTML = `
       <div class="profile-card">
         <div class="profile-avatar">${escHtml(user.username.charAt(0).toUpperCase())}</div>
@@ -628,8 +660,11 @@ function loadProfile(username) {
             <span>가입: ${formatDate(user.created_at)}</span>
             <span>글 ${user.post_count}개</span>
             <span>댓글 ${user.comment_count}개</span>
+            <span>팔로워 ${user.follower_count}</span>
+            <span>팔로잉 ${user.following_count}</span>
           </div>
         </div>
+        ${user.is_following || !isMyPage && currentUser ? `<div class="profile-actions">${actionBtns}</div>` : ""}
       </div>
     `;
 
@@ -645,6 +680,21 @@ function loadProfile(username) {
     switchProfileTab("posts");
     loadProfilePosts(username, 1);
   }).catch(() => { header.innerHTML = '<div class="empty error-msg">사용자를 찾을 수 없습니다.</div>'; });
+}
+
+function toggleFollow(username) {
+  if (!currentUser) { showAuthModal("signup"); return; }
+  authFetch(`/api/users/${encodeURIComponent(username)}/follow`, { method: "POST" })
+    .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e.error)); return r.json(); })
+    .then(data => {
+      const btn = document.querySelector(".btn-follow");
+      if (btn) {
+        btn.textContent = data.following ? "팔로잉" : "팔로우";
+        btn.classList.toggle("following", data.following);
+      }
+      loadProfile(currentProfileUsername);
+    })
+    .catch(err => showAlertModal(typeof err === "string" ? err : "요청 실패"));
 }
 
 function loadProfilePosts(username, page) {
@@ -806,7 +856,203 @@ async function deleteAccount() {
   }
 }
 
+let currentRoomId = null;
+
+function connectChatSocket(roomId) {
+  if (chatSocket) { chatSocket.disconnect(); chatSocket = null; }
+  const token = getToken();
+  if (!token) return;
+  chatSocket = io({ query: { token }, transports: ["websocket", "polling"] });
+  chatSocket.on("connect", () => { chatSocket.emit("join-room", roomId); });
+  chatSocket.on("new-message", (msg) => {
+    const container = document.getElementById("chat-messages-container");
+    const emptyEl = container.querySelector(".empty");
+    if (emptyEl) container.innerHTML = "";
+    container.insertAdjacentHTML("beforeend", `
+      <div class="chat-msg ${msg.user_id === currentUser.id ? 'chat-msg-mine' : ''}">
+        <div class="chat-msg-author">${msg.user_id === currentUser.id ? '' : escHtml(msg.username)}</div>
+        <div class="chat-msg-bubble">${escHtml(msg.content)}</div>
+        <div class="chat-msg-time">${formatDate(msg.created_at)}</div>
+      </div>
+    `);
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+function showChatList() {
+  if (chatSocket) { chatSocket.disconnect(); chatSocket = null; }
+  hideAllViews();
+  document.getElementById("view-chat").classList.remove("hidden");
+  loadChatRooms();
+  updateHash();
+}
+
+function loadChatRooms() {
+  const container = document.getElementById("chat-rooms-container");
+  container.innerHTML = '<div class="loading">불러오는 중...</div>';
+  authFetch("/api/chat/rooms").then(r => r.json()).then(rooms => {
+    if (rooms.length === 0) {
+      container.innerHTML = '<div class="empty">채팅방이 없습니다.<br>다른 사용자를 팔로우하고 메시지를 보내보세요!</div>';
+      return;
+    }
+    container.innerHTML = rooms.map(r => `
+      <div class="chat-room-item" onclick="showChatRoom(${r.room_id}, '${escHtml(r.other_username)}')">
+        <div class="chat-room-avatar">${escHtml((r.other_username || "?").charAt(0).toUpperCase())}</div>
+        <div class="chat-room-info">
+          <div class="chat-room-name">${escHtml(r.other_username || "알 수 없음")}</div>
+          <div class="chat-room-preview">${escHtml(r.last_message || "메시지가 없습니다")}</div>
+        </div>
+        <div class="chat-room-meta">
+          ${r.last_message_at ? formatDate(r.last_message_at) : ""}
+          <span class="chat-room-count">메시지 ${r.message_count}개</span>
+        </div>
+      </div>
+    `).join("");
+  }).catch(() => { container.innerHTML = '<div class="empty error-msg">채팅방을 불러오지 못했습니다.</div>'; });
+}
+
+function showChatRoom(roomId, otherUsername) {
+  currentRoomId = roomId;
+  hideAllViews();
+  document.getElementById("view-chat-room").classList.remove("hidden");
+  if (otherUsername) {
+    document.getElementById("chat-room-title").textContent = `💬 ${otherUsername}`;
+  } else {
+    document.getElementById("chat-room-title").textContent = "💬 ...";
+    authFetch("/api/chat/rooms").then(r => r.json()).then(rooms => {
+      const room = rooms.find(r => r.room_id === roomId);
+      if (room) document.getElementById("chat-room-title").textContent = `💬 ${room.other_username}`;
+    }).catch(() => {});
+  }
+  loadChatMessages();
+  connectChatSocket(roomId);
+  updateHash();
+}
+
+function loadChatMessages() {
+  const container = document.getElementById("chat-messages-container");
+  container.innerHTML = '<div class="loading">불러오는 중...</div>';
+  authFetch(`/api/chat/rooms/${currentRoomId}/messages`).then(r => r.json()).then(data => {
+    if (data.messages.length === 0) {
+      container.innerHTML = '<div class="empty">메시지가 없습니다.<br>첫 메시지를 보내보세요!</div>';
+      return;
+    }
+    container.innerHTML = data.messages.slice().reverse().map(m => `
+      <div class="chat-msg ${m.user_id === currentUser.id ? 'chat-msg-mine' : ''}">
+        <div class="chat-msg-author">${m.user_id === currentUser.id ? '' : escHtml(m.username)}</div>
+        <div class="chat-msg-bubble">${escHtml(m.content)}</div>
+        <div class="chat-msg-time">${formatDate(m.created_at)}</div>
+      </div>
+    `).join("");
+    container.scrollTop = container.scrollHeight;
+  }).catch(() => { container.innerHTML = '<div class="empty error-msg">메시지를 불러오지 못했습니다.</div>'; });
+}
+
+function sendChatMessage() {
+  const input = document.getElementById("chat-input");
+  const content = input.value.trim();
+  if (!content) return;
+  input.value = "";
+  authFetch(`/api/chat/rooms/${currentRoomId}/messages`, { method: "POST", body: JSON.stringify({ content }) })
+    .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e.error)); return r.json(); })
+    .catch(err => showAlertModal(typeof err === "string" ? err : "메시지 전송에 실패했습니다."));
+}
+
+function startChat(username) {
+  if (!currentUser) { showAuthModal("signup"); return; }
+  authFetch(`/api/chat/rooms/${encodeURIComponent(username)}`, { method: "POST" })
+    .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e.error)); return r.json(); })
+    .then(data => showChatRoom(data.roomId, username))
+    .catch(err => showAlertModal(typeof err === "string" ? err : "채팅방을 생성할 수 없습니다."));
+}
+
+function updateHash() {
+  if (updatingHash) return;
+  const view = document.querySelector("main:not(.hidden)");
+  if (!view) return;
+  const id = view.id;
+  let hash = "";
+  if (id === "view-list") {
+    const params = new URLSearchParams();
+    if (currentPage > 1) params.set("page", currentPage);
+    if (currentCategory) params.set("category", currentCategory);
+    if (currentSort !== "latest") params.set("sort", currentSort);
+    const search = document.getElementById("search-input").value.trim();
+    if (search) params.set("search", search);
+    hash = "#list" + (params.toString() ? "?" + params.toString() : "");
+  } else if (id === "view-detail" && currentPostId) {
+    hash = "#post/" + currentPostId;
+  } else if (id === "view-write") {
+    hash = "#write";
+  } else if (id === "view-edit" && currentPostId) {
+    hash = "#edit/" + currentPostId;
+  } else if (id === "view-profile" && currentProfileUsername) {
+    hash = "#profile/" + encodeURIComponent(currentProfileUsername);
+  } else if (id === "view-chat") {
+    hash = "#chat";
+  } else if (id === "view-chat-room" && currentRoomId) {
+    const title = document.getElementById("chat-room-title").textContent.replace("💬 ", "");
+    hash = "#chat-room/" + currentRoomId + (title ? "/" + encodeURIComponent(title) : "");
+  }
+  if (hash && location.hash !== hash) {
+    updatingHash = true;
+    location.hash = hash;
+  }
+}
+
+function loadFromHash() {
+  const hash = location.hash || "#list";
+  if (hash === "#list" || hash === "" || hash === "#") {
+    const params = new URLSearchParams(hash.includes("?") ? hash.split("?")[1] : "");
+    if (params.get("category")) currentCategory = params.get("category");
+    if (params.get("sort")) currentSort = params.get("sort");
+    currentPage = parseInt(params.get("page")) || 1;
+    const search = params.get("search") || "";
+    document.getElementById("search-input").value = search;
+    showList();
+    return;
+  }
+  if (hash.startsWith("#post/")) {
+    const id = parseInt(hash.split("/")[1]);
+    if (id) showDetail(id);
+    return;
+  }
+  if (hash === "#write") { showWrite(); return; }
+  if (hash.startsWith("#edit/")) {
+    const id = parseInt(hash.split("/")[1]);
+    if (id) showEdit(id);
+    return;
+  }
+  if (hash.startsWith("#profile/")) {
+    const username = decodeURIComponent(hash.split("/")[1]);
+    if (username) { showProfile(username); return; }
+  }
+  if (hash === "#chat") { showChatList(); return; }
+  if (hash.startsWith("#chat-room/")) {
+    const parts = hash.split("/");
+    const roomId = parseInt(parts[1]);
+    const otherUsername = parts.length > 2 ? decodeURIComponent(parts.slice(2).join("/")) : "";
+    if (roomId) {
+      showChatRoom(roomId, otherUsername || null);
+      loadChatMessages();
+    }
+    return;
+  }
+  showList();
+}
+
+let updatingHash = false;
+
 document.addEventListener("DOMContentLoaded", () => {
   restoreSession();
-  showList();
+  if (location.hash) {
+    loadFromHash();
+  } else {
+    showList();
+  }
+});
+
+window.addEventListener("hashchange", () => {
+  if (updatingHash) { updatingHash = false; return; }
+  loadFromHash();
 });

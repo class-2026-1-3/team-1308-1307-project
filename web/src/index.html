@@ -10,12 +10,15 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io@4.8.1/client-dist/socket.io.min.js"></script>
   </head>
   <body>
     <header>
       <div class="header-inner">
         <div class="logo" onclick="showList()">
-          <span class="logo-bracket">[</span>커뮤니티<span class="logo-bracket">]</span>
+          <span class="logo-bracket">[</span>BSSM 커뮤니티<span class="logo-bracket">]</span>
         </div>
         <div class="header-actions">
           <div id="header-user" class="header-user hidden">
@@ -27,6 +30,7 @@
             <button id="btn-logout" class="btn-auth-out" onclick="logout()">로그아웃</button>
           </div>
           <button id="btn-login" class="btn-auth" onclick="showAuthModal()">로그인</button>
+          <button id="btn-chat" class="btn-chat hidden" onclick="showChatList()">💬 채팅</button>
           <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
         </div>
       </div>
@@ -42,11 +46,11 @@
         <div id="auth-login" class="auth-form">
           <div class="form-group">
             <label>닉네임</label>
-            <input type="text" id="login-username" placeholder="닉네임 입력" onkeydown="if (event.key === 'Enter') login()" />
+            <input type="text" id="login-username" placeholder="닉네임 입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) login()" />
           </div>
           <div class="form-group">
             <label>비밀번호</label>
-            <input type="password" id="login-password" placeholder="비밀번호 입력" onkeydown="if (event.key === 'Enter') login()" />
+            <input type="password" id="login-password" placeholder="비밀번호 입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) login()" />
           </div>
           <div id="login-error" class="auth-error hidden"></div>
           <button class="btn-submit full" onclick="login()">로그인</button>
@@ -54,15 +58,15 @@
         <div id="auth-signup" class="auth-form hidden">
           <div class="form-group">
             <label>닉네임</label>
-            <input type="text" id="signup-username" placeholder="닉네임 입력" onkeydown="if (event.key === 'Enter') signup()" />
+            <input type="text" id="signup-username" placeholder="닉네임 입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) signup()" />
           </div>
           <div class="form-group">
             <label>비밀번호</label>
-            <input type="password" id="signup-password" placeholder="비밀번호 (4자 이상)" onkeydown="if (event.key === 'Enter') signup()" />
+            <input type="password" id="signup-password" placeholder="비밀번호 (4자 이상)" onkeydown="if (event.key === 'Enter' && !event.isComposing) signup()" />
           </div>
           <div class="form-group">
             <label>비밀번호 확인</label>
-            <input type="password" id="signup-password-confirm" placeholder="비밀번호 재입력" onkeydown="if (event.key === 'Enter') signup()" />
+            <input type="password" id="signup-password-confirm" placeholder="비밀번호 재입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) signup()" />
           </div>
           <div id="signup-error" class="auth-error hidden"></div>
           <button class="btn-submit full" onclick="signup()">회원가입</button>
@@ -99,7 +103,7 @@
               <button id="sort-popular" class="sort-tab" onclick="setSort('popular')">인기순</button>
             </div>
             <div class="search-box">
-              <input type="text" id="search-input" placeholder="제목 검색..." onkeydown="if (event.key === 'Enter') searchPosts()" />
+              <input type="text" id="search-input" placeholder="제목 검색..." onkeydown="if (event.key === 'Enter' && !event.isComposing) searchPosts()" />
               <button class="btn-search" onclick="searchPosts()">검색</button>
             </div>
           </div>
@@ -127,7 +131,15 @@
           </div>
           <div class="form-group">
             <label>내용</label>
-            <textarea id="write-content" rows="8" placeholder="내용을 입력하세요"></textarea>
+            <div class="md-toolbar">
+              <button type="button" class="md-btn" onclick="insertMd('write-content','**','**')" title="굵게"><b>B</b></button>
+              <button type="button" class="md-btn" onclick="insertMd('write-content','*','*')" title="기울임"><i>I</i></button>
+              <button type="button" class="md-btn" onclick="insertMd('write-content','[','](url)')" title="링크">🔗</button>
+              <button type="button" class="md-btn" onclick="insertMd('write-content','![','](url)')" title="이미지">🖼</button>
+              <button type="button" class="md-btn" onclick="insertMd('write-content','\n```\n','\n```\n')" title="코드 블록">&lt;/&gt;</button>
+              <button type="button" class="md-btn" onclick="insertMd('write-content','\n- ','')" title="리스트">•</button>
+            </div>
+            <textarea id="write-content" rows="8" placeholder="내용을 입력하세요 (Markdown 지원)"></textarea>
           </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showList()">취소</button>
@@ -154,7 +166,15 @@
           </div>
           <div class="form-group">
             <label>내용</label>
-            <textarea id="edit-content" rows="8" placeholder="내용을 입력하세요"></textarea>
+            <div class="md-toolbar">
+              <button type="button" class="md-btn" onclick="insertMd('edit-content','**','**')" title="굵게"><b>B</b></button>
+              <button type="button" class="md-btn" onclick="insertMd('edit-content','*','*')" title="기울임"><i>I</i></button>
+              <button type="button" class="md-btn" onclick="insertMd('edit-content','[','](url)')" title="링크">🔗</button>
+              <button type="button" class="md-btn" onclick="insertMd('edit-content','![','](url)')" title="이미지">🖼</button>
+              <button type="button" class="md-btn" onclick="insertMd('edit-content','\n```\n','\n```\n')" title="코드 블록">&lt;/&gt;</button>
+              <button type="button" class="md-btn" onclick="insertMd('edit-content','\n- ','')" title="리스트">•</button>
+            </div>
+            <textarea id="edit-content" rows="8" placeholder="내용을 입력하세요 (Markdown 지원)"></textarea>
           </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showDetail(currentPostId)">취소</button>
@@ -191,7 +211,7 @@
           </div>
           <div id="comment-form" class="comment-form">
             <div class="comment-inputs">
-              <input type="text" id="comment-content" placeholder="댓글을 입력하세요" onkeydown="if (event.key === 'Enter') submitComment();" />
+              <input type="text" id="comment-content" placeholder="댓글을 입력하세요" onkeydown="if (event.key === 'Enter' && !event.isComposing) submitComment();" />
             </div>
             <button class="btn-submit small" onclick="submitComment()">등록</button>
           </div>
@@ -241,6 +261,30 @@
           </div>
         </div>
         <div id="profile-pagination" class="pagination"></div>
+      </div>
+    </main>
+
+    <main id="view-chat" class="hidden">
+      <div class="container narrow">
+        <div class="page-title">
+          <h2>💬 채팅</h2>
+          <button class="btn-back" onclick="showList()">← 목록으로</button>
+        </div>
+        <div id="chat-rooms-container"><div class="loading">불러오는 중...</div></div>
+      </div>
+    </main>
+
+    <main id="view-chat-room" class="hidden">
+      <div class="container narrow">
+        <div class="page-title">
+          <button class="btn-back" onclick="showChatList()">← 채팅 목록</button>
+          <h2 id="chat-room-title"></h2>
+        </div>
+        <div id="chat-messages-container" class="chat-messages"><div class="loading">불러오는 중...</div></div>
+        <div class="chat-input-area">
+          <input type="text" id="chat-input" placeholder="메시지를 입력하세요" onkeydown="if (event.key === 'Enter' && !event.isComposing) sendChatMessage()" />
+          <button class="btn-submit small" onclick="sendChatMessage()">전송</button>
+        </div>
       </div>
     </main>
 
