@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BSSM 커뮤니티</title>
+    <title>커뮤니티</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap"
@@ -15,12 +15,18 @@
     <header>
       <div class="header-inner">
         <div class="logo" onclick="showList()">
-          <span class="logo-bracket">[</span>BSSM 커뮤니티<span class="logo-bracket">]</span>
+          <span class="logo-bracket">[</span>커뮤니티<span class="logo-bracket">]</span>
         </div>
         <div class="header-actions">
-          <span id="header-username" class="header-username hidden"></span>
+          <div id="header-user" class="header-user hidden">
+            <button class="btn-user" onclick="showMyPage()">
+              <span class="user-icon">👤</span>
+              <span id="header-username"></span>
+            </button>
+            <span class="header-divider"></span>
+            <button id="btn-logout" class="btn-auth-out" onclick="logout()">로그아웃</button>
+          </div>
           <button id="btn-login" class="btn-auth" onclick="showAuthModal()">로그인</button>
-          <button id="btn-logout" class="btn-auth-out hidden" onclick="logout()">로그아웃</button>
           <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
         </div>
       </div>
@@ -60,7 +66,23 @@
           </div>
           <div id="signup-error" class="auth-error hidden"></div>
           <button class="btn-submit full" onclick="signup()">회원가입</button>
-          <p class="auth-note">※ 회원가입 없이도 닉네임 + 비밀번호를 입력하여 글을 작성할 수 있습니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="dialog-modal" class="modal-overlay hidden">
+      <div class="dialog-content">
+        <div id="dialog-message"></div>
+        <div id="dialog-input-wrap" class="hidden">
+          <input type="text" id="dialog-input" placeholder="" />
+        </div>
+        <div id="dialog-password-wrap" class="hidden">
+          <input type="password" id="dialog-password-input" placeholder="" />
+        </div>
+        <div id="dialog-error" class="auth-error hidden"></div>
+        <div class="dialog-actions">
+          <button id="dialog-cancel-btn" class="btn-cancel hidden">취소</button>
+          <button id="dialog-confirm-btn" class="btn-submit">확인</button>
         </div>
       </div>
     </div>
@@ -71,19 +93,19 @@
           <div class="page-title">
             <h2>전체 글 <span id="post-count" class="count-badge">0</span></h2>
           </div>
-          <div class="search-box">
-            <input
-              type="text"
-              id="search-input"
-              placeholder="제목 검색..."
-              onkeydown="if (event.key === 'Enter') searchPosts()"
-            />
-            <button class="btn-search" onclick="searchPosts()">검색</button>
+          <div class="list-controls">
+            <div class="sort-tabs">
+              <button id="sort-latest" class="sort-tab active" onclick="setSort('latest')">최신순</button>
+              <button id="sort-popular" class="sort-tab" onclick="setSort('popular')">인기순</button>
+            </div>
+            <div class="search-box">
+              <input type="text" id="search-input" placeholder="제목 검색..." onkeydown="if (event.key === 'Enter') searchPosts()" />
+              <button class="btn-search" onclick="searchPosts()">검색</button>
+            </div>
           </div>
         </div>
-        <div id="posts-container">
-          <div class="loading">불러오는 중...</div>
-        </div>
+        <div id="category-tabs" class="category-tabs"></div>
+        <div id="posts-container"><div class="loading">불러오는 중...</div></div>
         <div id="pagination" class="pagination"></div>
       </div>
     </main>
@@ -95,13 +117,9 @@
           <button class="btn-back" onclick="showList()">← 목록으로</button>
         </div>
         <div class="form-card">
-          <div class="form-group" id="write-username-group">
-            <label>닉네임</label>
-            <input type="text" id="write-username" placeholder="닉네임 입력" />
-          </div>
-          <div class="form-group" id="write-password-group">
-            <label>비밀번호</label>
-            <input type="password" id="write-password" placeholder="게스트: 수정/삭제 시 필요" />
+          <div class="form-group">
+            <label>카테고리</label>
+            <select id="write-category"><option value="">카테고리 선택</option></select>
           </div>
           <div class="form-group">
             <label>제목</label>
@@ -127,20 +145,16 @@
         </div>
         <div class="form-card">
           <div class="form-group">
+            <label>카테고리</label>
+            <select id="edit-category"><option value="">카테고리 선택</option></select>
+          </div>
+          <div class="form-group">
             <label>제목</label>
             <input type="text" id="edit-title" placeholder="제목을 입력하세요" />
           </div>
           <div class="form-group">
             <label>내용</label>
             <textarea id="edit-content" rows="8" placeholder="내용을 입력하세요"></textarea>
-          </div>
-          <div class="form-group" id="edit-username-group">
-            <label>닉네임 확인</label>
-            <input type="text" id="edit-username" placeholder="작성 시 사용한 닉네임" />
-          </div>
-          <div class="form-group" id="edit-password-group">
-            <label>비밀번호</label>
-            <input type="password" id="edit-password" placeholder="게스트: 작성 시 설정한 비밀번호" />
           </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showDetail(currentPostId)">취소</button>
@@ -155,30 +169,78 @@
         <div class="detail-top-bar">
           <button class="btn-back" onclick="showList()">← 목록으로</button>
           <div class="detail-actions">
+            <button id="btn-pin" class="btn-pin hidden" onclick="togglePin()">📌 고정</button>
             <button class="btn-edit" onclick="showEdit(currentPostId)">수정</button>
             <button class="btn-delete" onclick="deletePost()">삭제</button>
           </div>
         </div>
         <div id="post-detail"></div>
+        <div class="post-actions-bar">
+          <button id="btn-like" class="btn-like" onclick="toggleLike()">
+            <span id="like-icon">♡</span>
+            <span id="like-count">0</span>
+          </button>
+        </div>
         <div class="comment-section">
           <h3 class="comment-title">
             댓글 <span id="comment-count" class="count-badge">0</span>
           </h3>
           <div id="comments-container"></div>
-          <div class="comment-form">
+          <div id="comment-login-prompt" class="comment-form hidden">
+            <p class="comment-login-text">댓글을 작성하려면 <a href="#" onclick="showAuthModal();return false">로그인</a> 또는 <a href="#" onclick="showAuthModal();return false">회원가입</a>이 필요합니다.</p>
+          </div>
+          <div id="comment-form" class="comment-form">
             <div class="comment-inputs">
-              <input type="text" id="comment-username" placeholder="닉네임" />
-              <input type="password" id="comment-password" placeholder="비밀번호 (게스트)" />
-              <input
-                type="text"
-                id="comment-content"
-                placeholder="댓글을 입력하세요"
-                onkeydown="if (event.key === 'Enter') submitComment();"
-              />
+              <input type="text" id="comment-content" placeholder="댓글을 입력하세요" onkeydown="if (event.key === 'Enter') submitComment();" />
             </div>
             <button class="btn-submit small" onclick="submitComment()">등록</button>
           </div>
         </div>
+      </div>
+    </main>
+
+    <main id="view-profile" class="hidden">
+      <div class="container narrow">
+        <button class="btn-back" onclick="showList()">← 목록으로</button>
+        <div id="profile-header"></div>
+        <div class="profile-tabs">
+          <button id="ptab-posts" class="profile-tab active" onclick="switchProfileTab('posts')">작성글</button>
+          <button id="ptab-comments" class="profile-tab" onclick="switchProfileTab('comments')">댓글</button>
+          <button id="ptab-settings" class="profile-tab" onclick="switchProfileTab('settings')">설정</button>
+        </div>
+        <div id="profile-posts"><div class="loading">불러오는 중...</div></div>
+        <div id="profile-comments" class="hidden"><div class="loading">불러오는 중...</div></div>
+        <div id="profile-settings" class="hidden">
+          <div class="form-card" id="settings-info">
+            <h3 class="settings-title">내 정보</h3>
+            <div id="settings-userinfo" class="settings-info-body"></div>
+          </div>
+          <div class="form-card" style="margin-top:16px">
+            <h3 class="settings-title">비밀번호 변경</h3>
+            <div class="form-group">
+              <label>현재 비밀번호</label>
+              <input type="password" id="pw-current" placeholder="현재 비밀번호 입력" />
+            </div>
+            <div class="form-group">
+              <label>새 비밀번호</label>
+              <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)" />
+            </div>
+            <div class="form-group">
+              <label>새 비밀번호 확인</label>
+              <input type="password" id="pw-confirm" placeholder="새 비밀번호 재입력" />
+            </div>
+            <div id="pw-error" class="auth-error hidden"></div>
+            <div id="pw-success" class="auth-success hidden"></div>
+            <button class="btn-submit full" onclick="changePassword()">비밀번호 변경</button>
+          </div>
+          <div class="form-card" style="margin-top:16px">
+            <h3 class="settings-title settings-danger">회원탈퇴</h3>
+            <p class="settings-desc">탈퇴 시 모든 작성 글과 댓글이 삭제되며 복구할 수 없습니다.</p>
+            <div id="delete-error" class="auth-error hidden"></div>
+            <button class="btn-delete-account" onclick="deleteAccount()">회원탈퇴</button>
+          </div>
+        </div>
+        <div id="profile-pagination" class="pagination"></div>
       </div>
     </main>
 
