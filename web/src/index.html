@@ -18,43 +18,90 @@
     <header>
       <div class="header-inner">
         <div class="logo" onclick="showList()">
-          <span class="logo-bracket">[</span>BSSM 커뮤니티<span class="logo-bracket">]</span>
+          <span class="logo-bracket">[</span>BSSM 커뮤니티<span
+            class="logo-bracket"
+            >]</span
+          >
         </div>
         <div class="header-actions">
           <div id="header-user" class="header-user hidden">
+            <button
+              id="btn-notif"
+              class="btn-notif hidden"
+              onclick="showNotifications()"
+            >
+              <span id="notif-bell">🔔</span>
+              <span id="notif-badge" class="notif-badge hidden">0</span>
+            </button>
             <button class="btn-user" onclick="showMyPage()">
               <span class="user-icon">👤</span>
               <span id="header-username"></span>
             </button>
             <span class="header-divider"></span>
-            <button id="btn-logout" class="btn-auth-out" onclick="logout()">로그아웃</button>
-          </div>
-          <button id="btn-login" class="btn-auth" onclick="showAuthModal()">로그인</button>
-            <button id="btn-chat" class="btn-chat hidden" onclick="showChatList()">💬 채팅</button>
-            <button id="btn-notif" class="btn-notif hidden" onclick="showNotifications()">
-              <span id="notif-bell">🔔</span>
-              <span id="notif-badge" class="notif-badge hidden">0</span>
+            <button id="btn-logout" class="btn-auth-out" onclick="logout()">
+              로그아웃
             </button>
-            <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
+          </div>
+          <button id="btn-login" class="btn-auth" onclick="showAuthModal()">
+            로그인
+          </button>
+          <button
+            id="btn-chat"
+            class="btn-chat hidden"
+            onclick="showChatList()"
+          >
+            💬 채팅
+          </button>
+          <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
         </div>
       </div>
     </header>
 
-    <div id="auth-modal" class="modal-overlay hidden" onclick="if (event.target === this) hideAuthModal()">
+    <div
+      id="auth-modal"
+      class="modal-overlay hidden"
+      onclick="if (event.target === this) hideAuthModal();"
+    >
       <div class="modal-content" onclick="event.stopPropagation()">
         <button class="modal-close" onclick="hideAuthModal()">✕</button>
         <div class="modal-tabs">
-          <button id="tab-login" class="modal-tab active" onclick="switchAuthTab('login')">로그인</button>
-          <button id="tab-signup" class="modal-tab" onclick="switchAuthTab('signup')">회원가입</button>
+          <button
+            id="tab-login"
+            class="modal-tab active"
+            onclick="switchAuthTab('login')"
+          >
+            로그인
+          </button>
+          <button
+            id="tab-signup"
+            class="modal-tab"
+            onclick="switchAuthTab('signup')"
+          >
+            회원가입
+          </button>
         </div>
         <div id="auth-login" class="auth-form">
           <div class="form-group">
             <label>닉네임</label>
-            <input type="text" id="login-username" placeholder="닉네임 입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) login()" />
+            <input
+              type="text"
+              id="login-username"
+              placeholder="닉네임 입력"
+              onkeydown="
+                if (event.key === 'Enter' && !event.isComposing) login();
+              "
+            />
           </div>
           <div class="form-group">
             <label>비밀번호</label>
-            <input type="password" id="login-password" placeholder="비밀번호 입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) login()" />
+            <input
+              type="password"
+              id="login-password"
+              placeholder="비밀번호 입력"
+              onkeydown="
+                if (event.key === 'Enter' && !event.isComposing) login();
+              "
+            />
           </div>
           <div id="login-error" class="auth-error hidden"></div>
           <button class="btn-submit full" onclick="login()">로그인</button>
@@ -62,15 +109,36 @@
         <div id="auth-signup" class="auth-form hidden">
           <div class="form-group">
             <label>닉네임</label>
-            <input type="text" id="signup-username" placeholder="닉네임 입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) signup()" />
+            <input
+              type="text"
+              id="signup-username"
+              placeholder="닉네임 입력"
+              onkeydown="
+                if (event.key === 'Enter' && !event.isComposing) signup();
+              "
+            />
           </div>
           <div class="form-group">
             <label>비밀번호</label>
-            <input type="password" id="signup-password" placeholder="비밀번호 (4자 이상)" onkeydown="if (event.key === 'Enter' && !event.isComposing) signup()" />
+            <input
+              type="password"
+              id="signup-password"
+              placeholder="비밀번호 (4자 이상)"
+              onkeydown="
+                if (event.key === 'Enter' && !event.isComposing) signup();
+              "
+            />
           </div>
           <div class="form-group">
             <label>비밀번호 확인</label>
-            <input type="password" id="signup-password-confirm" placeholder="비밀번호 재입력" onkeydown="if (event.key === 'Enter' && !event.isComposing) signup()" />
+            <input
+              type="password"
+              id="signup-password-confirm"
+              placeholder="비밀번호 재입력"
+              onkeydown="
+                if (event.key === 'Enter' && !event.isComposing) signup();
+              "
+            />
           </div>
           <div id="signup-error" class="auth-error hidden"></div>
           <button class="btn-submit full" onclick="signup()">회원가입</button>
@@ -103,17 +171,39 @@
           </div>
           <div class="list-controls">
             <div class="sort-tabs">
-              <button id="sort-latest" class="sort-tab active" onclick="setSort('latest')">최신순</button>
-              <button id="sort-popular" class="sort-tab" onclick="setSort('popular')">인기순</button>
+              <button
+                id="sort-latest"
+                class="sort-tab active"
+                onclick="setSort('latest')"
+              >
+                최신순
+              </button>
+              <button
+                id="sort-popular"
+                class="sort-tab"
+                onclick="setSort('popular')"
+              >
+                인기순
+              </button>
             </div>
             <div class="search-box">
-              <input type="text" id="search-input" placeholder="제목 검색..." onkeydown="if (event.key === 'Enter' && !event.isComposing) searchPosts()" />
+              <input
+                type="text"
+                id="search-input"
+                placeholder="제목 검색..."
+                onkeydown="
+                  if (event.key === 'Enter' && !event.isComposing)
+                    searchPosts();
+                "
+              />
               <button class="btn-search" onclick="searchPosts()">검색</button>
             </div>
           </div>
         </div>
         <div id="category-tabs" class="category-tabs"></div>
-        <div id="posts-container"><div class="loading">불러오는 중...</div></div>
+        <div id="posts-container">
+          <div class="loading">불러오는 중...</div>
+        </div>
         <div id="pagination" class="pagination"></div>
       </div>
     </main>
@@ -122,28 +212,80 @@
       <div class="container narrow">
         <div class="page-title">
           <h2>새 글 작성</h2>
-          <button class="btn-back" onclick="showList()">← 목록으로</button>
+          <button class="btn-back" onclick="goBack()">← 목록으로</button>
         </div>
         <div class="form-card">
           <div class="form-group">
             <label>카테고리</label>
-            <select id="write-category"><option value="">카테고리 선택</option></select>
+            <select id="write-category">
+              <option value="">카테고리 선택</option>
+            </select>
           </div>
           <div class="form-group">
             <label>제목</label>
-            <input type="text" id="write-title" placeholder="제목을 입력하세요" />
+            <input
+              type="text"
+              id="write-title"
+              placeholder="제목을 입력하세요"
+            />
           </div>
           <div class="form-group">
             <label>내용</label>
             <div class="md-toolbar">
-              <button type="button" class="md-btn" onclick="insertMd('write-content','**','**')" title="굵게"><b>B</b></button>
-              <button type="button" class="md-btn" onclick="insertMd('write-content','*','*')" title="기울임"><i>I</i></button>
-              <button type="button" class="md-btn" onclick="insertLink('write-content')" title="링크">🔗</button>
-              <button type="button" class="md-btn" onclick="insertImage('write-content')" title="이미지">🖼</button>
-              <button type="button" class="md-btn" onclick="insertMd('write-content','\n```\n','\n```\n')" title="코드 블록">&lt;/&gt;</button>
-              <button type="button" class="md-btn" onclick="insertMd('write-content','\n- ','')" title="리스트">•</button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('write-content', '**', '**')"
+                title="굵게"
+              >
+                <b>B</b>
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('write-content', '*', '*')"
+                title="기울임"
+              >
+                <i>I</i>
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertLink('write-content')"
+                title="링크"
+              >
+                🔗
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertImage('write-content')"
+                title="이미지"
+              >
+                🖼
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('write-content', '\n```\n', '\n```\n')"
+                title="코드 블록"
+              >
+                &lt;/&gt;
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('write-content', '\n- ', '')"
+                title="리스트"
+              >
+                •
+              </button>
             </div>
-            <textarea id="write-content" rows="8" placeholder="내용을 입력하세요 (Markdown 지원)"></textarea>
+            <textarea
+              id="write-content"
+              rows="8"
+              placeholder="내용을 입력하세요 (Markdown 지원)"
+            ></textarea>
           </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showList()">취소</button>
@@ -157,31 +299,85 @@
       <div class="container narrow">
         <div class="page-title">
           <h2>글 수정</h2>
-          <button class="btn-back" onclick="showDetail(currentPostId)">← 돌아가기</button>
+          <button class="btn-back" onclick="goBack()">← 돌아가기</button>
         </div>
         <div class="form-card">
           <div class="form-group">
             <label>카테고리</label>
-            <select id="edit-category"><option value="">카테고리 선택</option></select>
+            <select id="edit-category">
+              <option value="">카테고리 선택</option>
+            </select>
           </div>
           <div class="form-group">
             <label>제목</label>
-            <input type="text" id="edit-title" placeholder="제목을 입력하세요" />
+            <input
+              type="text"
+              id="edit-title"
+              placeholder="제목을 입력하세요"
+            />
           </div>
           <div class="form-group">
             <label>내용</label>
             <div class="md-toolbar">
-              <button type="button" class="md-btn" onclick="insertMd('edit-content','**','**')" title="굵게"><b>B</b></button>
-              <button type="button" class="md-btn" onclick="insertMd('edit-content','*','*')" title="기울임"><i>I</i></button>
-              <button type="button" class="md-btn" onclick="insertLink('edit-content')" title="링크">🔗</button>
-              <button type="button" class="md-btn" onclick="insertImage('edit-content')" title="이미지">🖼</button>
-              <button type="button" class="md-btn" onclick="insertMd('edit-content','\n```\n','\n```\n')" title="코드 블록">&lt;/&gt;</button>
-              <button type="button" class="md-btn" onclick="insertMd('edit-content','\n- ','')" title="리스트">•</button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('edit-content', '**', '**')"
+                title="굵게"
+              >
+                <b>B</b>
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('edit-content', '*', '*')"
+                title="기울임"
+              >
+                <i>I</i>
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertLink('edit-content')"
+                title="링크"
+              >
+                🔗
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertImage('edit-content')"
+                title="이미지"
+              >
+                🖼
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('edit-content', '\n```\n', '\n```\n')"
+                title="코드 블록"
+              >
+                &lt;/&gt;
+              </button>
+              <button
+                type="button"
+                class="md-btn"
+                onclick="insertMd('edit-content', '\n- ', '')"
+                title="리스트"
+              >
+                •
+              </button>
             </div>
-            <textarea id="edit-content" rows="8" placeholder="내용을 입력하세요 (Markdown 지원)"></textarea>
+            <textarea
+              id="edit-content"
+              rows="8"
+              placeholder="내용을 입력하세요 (Markdown 지원)"
+            ></textarea>
           </div>
           <div class="form-actions">
-            <button class="btn-cancel" onclick="showDetail(currentPostId)">취소</button>
+            <button class="btn-cancel" onclick="showDetail(currentPostId)">
+              취소
+            </button>
             <button class="btn-submit" onclick="updatePost()">수정하기</button>
           </div>
         </div>
@@ -191,11 +387,15 @@
     <main id="view-detail" class="hidden">
       <div class="container narrow">
         <div class="detail-top-bar">
-          <button class="btn-back" onclick="showList()">← 목록으로</button>
+          <button class="btn-back" onclick="goBack()">← 목록으로</button>
           <div class="detail-actions">
-            <button id="btn-pin" class="btn-pin hidden" onclick="togglePin()">📌 고정</button>
-            <button class="btn-edit" onclick="showEdit(currentPostId)">수정</button>
-            <button class="btn-delete" onclick="deletePost()">삭제</button>
+            <button id="btn-pin" class="btn-pin hidden" onclick="togglePin()">
+              📌 고정
+            </button>
+            <button class="btn-edit hidden" id="btn-edit" onclick="showEdit(currentPostId)">
+              수정
+            </button>
+            <button class="btn-delete hidden" id="btn-delete" onclick="deletePost()">삭제</button>
           </div>
         </div>
         <div id="post-detail"></div>
@@ -206,62 +406,130 @@
           </button>
         </div>
         <div class="comment-section">
+          <div id="comment-login-prompt" class="comment-form hidden">
+            <p class="comment-login-text">
+              댓글을 작성하려면
+              <a
+                href="#"
+                onclick="
+                  showAuthModal();
+                  return false;
+                "
+                >로그인</a
+              >
+              또는
+              <a
+                href="#"
+                onclick="
+                  showAuthModal();
+                  return false;
+                "
+                >회원가입</a
+              >이 필요합니다.
+            </p>
+          </div>
+
           <h3 class="comment-title">
             댓글 <span id="comment-count" class="count-badge">0</span>
           </h3>
-          <div id="comments-container"></div>
-          <div id="comment-login-prompt" class="comment-form hidden">
-            <p class="comment-login-text">댓글을 작성하려면 <a href="#" onclick="showAuthModal();return false">로그인</a> 또는 <a href="#" onclick="showAuthModal();return false">회원가입</a>이 필요합니다.</p>
-          </div>
           <div id="comment-form" class="comment-form">
             <div class="comment-inputs">
-              <input type="text" id="comment-content" placeholder="댓글을 입력하세요" onkeydown="if (event.key === 'Enter' && !event.isComposing) submitComment();" />
+              <input
+                type="text"
+                id="comment-content"
+                placeholder="댓글을 입력하세요"
+                onkeydown="
+                  if (event.key === 'Enter' && !event.isComposing)
+                    submitComment();
+                "
+              />
             </div>
-            <button class="btn-submit small" onclick="submitComment()">등록</button>
+            <button class="btn-submit small" onclick="submitComment()">
+              등록
+            </button>
           </div>
+          <div id="comments-container"></div>
         </div>
       </div>
     </main>
 
     <main id="view-profile" class="hidden">
       <div class="container narrow">
-        <button class="btn-back" onclick="showList()">← 목록으로</button>
+        <button class="btn-back" onclick="goBack()">← 목록으로</button>
         <div id="profile-header"></div>
         <div class="profile-tabs">
-          <button id="ptab-posts" class="profile-tab active" onclick="switchProfileTab('posts')">작성글</button>
-          <button id="ptab-comments" class="profile-tab" onclick="switchProfileTab('comments')">댓글</button>
-          <button id="ptab-settings" class="profile-tab" onclick="switchProfileTab('settings')">설정</button>
+          <button
+            id="ptab-posts"
+            class="profile-tab active"
+            onclick="switchProfileTab('posts')"
+          >
+            작성글
+          </button>
+          <button
+            id="ptab-comments"
+            class="profile-tab"
+            onclick="switchProfileTab('comments')"
+          >
+            댓글
+          </button>
+          <button
+            id="ptab-settings"
+            class="profile-tab"
+            onclick="switchProfileTab('settings')"
+          >
+            설정
+          </button>
         </div>
         <div id="profile-posts"><div class="loading">불러오는 중...</div></div>
-        <div id="profile-comments" class="hidden"><div class="loading">불러오는 중...</div></div>
+        <div id="profile-comments" class="hidden">
+          <div class="loading">불러오는 중...</div>
+        </div>
         <div id="profile-settings" class="hidden">
           <div class="form-card" id="settings-info">
             <h3 class="settings-title">내 정보</h3>
             <div id="settings-userinfo" class="settings-info-body"></div>
           </div>
-          <div class="form-card" style="margin-top:16px">
+          <div class="form-card" style="margin-top: 16px">
             <h3 class="settings-title">비밀번호 변경</h3>
             <div class="form-group">
               <label>현재 비밀번호</label>
-              <input type="password" id="pw-current" placeholder="현재 비밀번호 입력" />
+              <input
+                type="password"
+                id="pw-current"
+                placeholder="현재 비밀번호 입력"
+              />
             </div>
             <div class="form-group">
               <label>새 비밀번호</label>
-              <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)" />
+              <input
+                type="password"
+                id="pw-new"
+                placeholder="새 비밀번호 (4자 이상)"
+              />
             </div>
             <div class="form-group">
               <label>새 비밀번호 확인</label>
-              <input type="password" id="pw-confirm" placeholder="새 비밀번호 재입력" />
+              <input
+                type="password"
+                id="pw-confirm"
+                placeholder="새 비밀번호 재입력"
+              />
             </div>
             <div id="pw-error" class="auth-error hidden"></div>
             <div id="pw-success" class="auth-success hidden"></div>
-            <button class="btn-submit full" onclick="changePassword()">비밀번호 변경</button>
+            <button class="btn-submit full" onclick="changePassword()">
+              비밀번호 변경
+            </button>
           </div>
-          <div class="form-card" style="margin-top:16px">
+          <div class="form-card" style="margin-top: 16px">
             <h3 class="settings-title settings-danger">회원탈퇴</h3>
-            <p class="settings-desc">탈퇴 시 모든 작성 글과 댓글이 삭제되며 복구할 수 없습니다.</p>
+            <p class="settings-desc">
+              탈퇴 시 모든 작성 글과 댓글이 삭제되며 복구할 수 없습니다.
+            </p>
             <div id="delete-error" class="auth-error hidden"></div>
-            <button class="btn-delete-account" onclick="deleteAccount()">회원탈퇴</button>
+            <button class="btn-delete-account" onclick="deleteAccount()">
+              회원탈퇴
+            </button>
           </div>
         </div>
         <div id="profile-pagination" class="pagination"></div>
@@ -274,7 +542,9 @@
           <h2>💬 채팅</h2>
           <button class="btn-back" onclick="showList()">← 목록으로</button>
         </div>
-        <div id="chat-rooms-container"><div class="loading">불러오는 중...</div></div>
+        <div id="chat-rooms-container">
+          <div class="loading">불러오는 중...</div>
+        </div>
       </div>
     </main>
 
@@ -284,10 +554,22 @@
           <button class="btn-back" onclick="showChatList()">← 채팅 목록</button>
           <h2 id="chat-room-title"></h2>
         </div>
-        <div id="chat-messages-container" class="chat-messages"><div class="loading">불러오는 중...</div></div>
+        <div id="chat-messages-container" class="chat-messages">
+          <div class="loading">불러오는 중...</div>
+        </div>
         <div class="chat-input-area">
-          <input type="text" id="chat-input" placeholder="메시지를 입력하세요" onkeydown="if (event.key === 'Enter' && !event.isComposing) sendChatMessage()" />
-          <button class="btn-submit small" onclick="sendChatMessage()">전송</button>
+          <input
+            type="text"
+            id="chat-input"
+            placeholder="메시지를 입력하세요"
+            onkeydown="
+              if (event.key === 'Enter' && !event.isComposing)
+                sendChatMessage();
+            "
+          />
+          <button class="btn-submit small" onclick="sendChatMessage()">
+            전송
+          </button>
         </div>
       </div>
     </main>
@@ -296,13 +578,24 @@
       <div class="container narrow">
         <div class="page-title">
           <h2>🔔 알림</h2>
-          <button class="btn-submit small" onclick="markAllNotifRead()">모두 읽음</button>
+          <button class="btn-submit small" onclick="markAllNotifRead()">
+            모두 읽음
+          </button>
         </div>
-        <div id="notifications-container"><div class="loading">불러오는 중...</div></div>
+        <div id="notifications-container">
+          <div class="loading">불러오는 중...</div>
+        </div>
       </div>
     </main>
 
-    <input type="file" id="image-upload-input" accept="image/*" style="display:none" onchange="handleImageUpload(event, this.getAttribute('data-textarea'))">
+    <input
+      type="file"
+      id="image-upload-input"
+      accept="image/*"
+      style="display: none"
+      onchange="handleImageUpload(event, this.getAttribute('data-textarea'))"
+    />
+    <div id="toast-container" class="toast-container"></div>
     <script src="app.js"></script>
   </body>
 </html>
