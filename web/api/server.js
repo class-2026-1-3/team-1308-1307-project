@@ -1,11 +1,13 @@
 const express = require("express");
 const mysql = require("mysql2");
 const path = require("path");
+const fs = require("fs");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const http = require("http");
 const { Server } = require("socket.io");
+const multer = require("multer");
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +22,37 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use(express.static(path.join(__dirname, "../src")));
+
+const uploadDir = path.join(__dirname, "..", "uploads");
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, Date.now() + "-" + Math.random().toString(36).slice(2) + ext);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  }
+});
+
+app.post("/api/upload", authenticate, requireAuth, (req, res) => {
+  upload.single("image")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: "업로드 오류: " + err.message });
+    if (!req.file) return res.status(400).json({ error: "파일을 선택하세요" });
+    res.json({ url: "/uploads/" + req.file.filename });
+  });
+});
+
+app.use("/uploads", express.static(uploadDir));
 
 const db = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -53,6 +86,7 @@ function runMigration() {
     "CREATE TABLE IF NOT EXISTS chat_rooms (id INT AUTO_INCREMENT PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS chat_room_members (id INT AUTO_INCREMENT PRIMARY KEY, room_id INT NOT NULL, user_id INT NOT NULL, UNIQUE KEY unique_member (room_id, user_id), FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS chat_messages (id INT AUTO_INCREMENT PRIMARY KEY, room_id INT NOT NULL, user_id INT NOT NULL, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, type VARCHAR(20) NOT NULL, message TEXT NOT NULL, related_user_id INT DEFAULT NULL, related_post_id INT DEFAULT NULL, related_comment_id INT DEFAULT NULL, related_room_id INT DEFAULT NULL, is_read TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, INDEX idx_notifications_user (user_id, is_read))",
     { table: "posts", col: "category_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL" },
     { table: "posts", col: "views", def: "INT DEFAULT 0" },
     { table: "posts", col: "is_pinned", def: "TINYINT(1) DEFAULT 0" },
@@ -447,6 +481,18 @@ app.post("/api/posts/:id/like", authenticate, requireAuth, (req, res) => {
         db.query("INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)",
           [req.params.id, req.user.id], (err) => {
             if (err) return res.status(500).json({ error: err.message });
+            db.query("SELECT user_id FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
+              if (!err && posts.length > 0 && posts[0].user_id !== req.user.id) {
+                const notifMsg = `${req.user.username}님이 회원님의 게시글을 좋아합니다.`;
+                db.query(
+                  "INSERT INTO notifications (user_id, type, message, related_user_id, related_post_id) VALUES (?, 'like', ?, ?, ?)",
+                  [posts[0].user_id, notifMsg, req.user.id, req.params.id],
+                  (err2) => {
+                    if (!err2 && io) io.to(`user:${posts[0].user_id}`).emit("new-notification", { type: "like", message: notifMsg });
+                  }
+                );
+              }
+            });
             db.query("SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = ?", [req.params.id], (err, result) => {
               if (err) return res.status(500).json({ error: err.message });
               res.json({ liked: true, likeCount: result[0].cnt });
@@ -658,7 +704,20 @@ app.post("/api/posts/:id/comments", authenticate, requireAuth, (req, res) => {
     [req.params.id, req.user.id, content.trim()],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.status(201).json({ id: result.insertId });
+      const commentId = result.insertId;
+      db.query("SELECT user_id FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
+        if (!err && posts.length > 0 && posts[0].user_id !== req.user.id) {
+          const notifMsg = `${req.user.username}님이 회원님의 게시글에 댓글을 남겼습니다.`;
+          db.query(
+            "INSERT INTO notifications (user_id, type, message, related_user_id, related_post_id, related_comment_id) VALUES (?, 'comment', ?, ?, ?, ?)",
+            [posts[0].user_id, notifMsg, req.user.id, req.params.id, commentId],
+            (err2) => {
+              if (!err2 && io) io.to(`user:${posts[0].user_id}`).emit("new-notification", { id: result.insertId, type: "comment", message: notifMsg });
+            }
+          );
+        }
+      });
+      res.status(201).json({ id: commentId });
     }
   );
 });
@@ -823,11 +882,72 @@ app.post("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, re
           if (err) return res.status(500).json({ error: err.message });
           const newMsg = { id: result.insertId, content: content.trim(), user_id: req.user.id, username: req.user.username, created_at: new Date() };
           io.to(`room:${req.params.roomId}`).emit("new-message", newMsg);
+          db.query(
+            "SELECT user_id FROM chat_room_members WHERE room_id = ? AND user_id != ?",
+            [req.params.roomId, req.user.id],
+            (err, others) => {
+              if (!err && others.length > 0) {
+                const otherId = others[0].user_id;
+                const notifMsg = `${req.user.username}님이 메시지를 보냈습니다.`;
+                db.query(
+                  "INSERT INTO notifications (user_id, type, message, related_user_id, related_room_id) VALUES (?, 'chat', ?, ?, ?)",
+                  [otherId, notifMsg, req.user.id, req.params.roomId],
+                  (err2) => {
+                    if (!err2 && io) io.to(`user:${otherId}`).emit("new-notification", { type: "chat", message: notifMsg, related_room_id: parseInt(req.params.roomId) });
+                  }
+                );
+              }
+            }
+          );
           res.status(201).json(newMsg);
         }
       );
     }
   );
+});
+
+app.get("/api/notifications", authenticate, requireAuth, (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = 20;
+  const offset = (page - 1) * limit;
+  db.query(
+    "SELECT COUNT(*) AS total FROM notifications WHERE user_id = ?",
+    [req.user.id], (err, countResult) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const total = countResult[0].total;
+      db.query(
+        "SELECT id, type, message, related_user_id, related_post_id, related_comment_id, related_room_id, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        [req.user.id, limit, offset],
+        (err, notifs) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ notifications: notifs, total, page, totalPages: Math.ceil(total / limit) || 1 });
+        }
+      );
+    }
+  );
+});
+
+app.get("/api/notifications/unread-count", authenticate, requireAuth, (req, res) => {
+  db.query("SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0", [req.user.id], (err, result) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ count: result[0].cnt });
+  });
+});
+
+app.post("/api/notifications/read", authenticate, requireAuth, (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: "알림 ID가 필요합니다" });
+  db.query("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?", [id, req.user.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+app.post("/api/notifications/read-all", authenticate, requireAuth, (req, res) => {
+  db.query("UPDATE notifications SET is_read = 1 WHERE user_id = ?", [req.user.id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
 });
 
 io.use((socket, next) => {
@@ -842,6 +962,7 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
+  socket.join(`user:${socket.user.id}`);
   socket.on("join-room", (roomId) => {
     db.query(
       "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",

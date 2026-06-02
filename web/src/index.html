@@ -30,8 +30,12 @@
             <button id="btn-logout" class="btn-auth-out" onclick="logout()">로그아웃</button>
           </div>
           <button id="btn-login" class="btn-auth" onclick="showAuthModal()">로그인</button>
-          <button id="btn-chat" class="btn-chat hidden" onclick="showChatList()">💬 채팅</button>
-          <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
+            <button id="btn-chat" class="btn-chat hidden" onclick="showChatList()">💬 채팅</button>
+            <button id="btn-notif" class="btn-notif hidden" onclick="showNotifications()">
+              <span id="notif-bell">🔔</span>
+              <span id="notif-badge" class="notif-badge hidden">0</span>
+            </button>
+            <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
         </div>
       </div>
     </header>
@@ -134,8 +138,8 @@
             <div class="md-toolbar">
               <button type="button" class="md-btn" onclick="insertMd('write-content','**','**')" title="굵게"><b>B</b></button>
               <button type="button" class="md-btn" onclick="insertMd('write-content','*','*')" title="기울임"><i>I</i></button>
-              <button type="button" class="md-btn" onclick="insertMd('write-content','[','](url)')" title="링크">🔗</button>
-              <button type="button" class="md-btn" onclick="insertMd('write-content','![','](url)')" title="이미지">🖼</button>
+              <button type="button" class="md-btn" onclick="insertLink('write-content')" title="링크">🔗</button>
+              <button type="button" class="md-btn" onclick="insertImage('write-content')" title="이미지">🖼</button>
               <button type="button" class="md-btn" onclick="insertMd('write-content','\n```\n','\n```\n')" title="코드 블록">&lt;/&gt;</button>
               <button type="button" class="md-btn" onclick="insertMd('write-content','\n- ','')" title="리스트">•</button>
             </div>
@@ -169,8 +173,8 @@
             <div class="md-toolbar">
               <button type="button" class="md-btn" onclick="insertMd('edit-content','**','**')" title="굵게"><b>B</b></button>
               <button type="button" class="md-btn" onclick="insertMd('edit-content','*','*')" title="기울임"><i>I</i></button>
-              <button type="button" class="md-btn" onclick="insertMd('edit-content','[','](url)')" title="링크">🔗</button>
-              <button type="button" class="md-btn" onclick="insertMd('edit-content','![','](url)')" title="이미지">🖼</button>
+              <button type="button" class="md-btn" onclick="insertLink('edit-content')" title="링크">🔗</button>
+              <button type="button" class="md-btn" onclick="insertImage('edit-content')" title="이미지">🖼</button>
               <button type="button" class="md-btn" onclick="insertMd('edit-content','\n```\n','\n```\n')" title="코드 블록">&lt;/&gt;</button>
               <button type="button" class="md-btn" onclick="insertMd('edit-content','\n- ','')" title="리스트">•</button>
             </div>
@@ -288,6 +292,17 @@
       </div>
     </main>
 
+    <main id="view-notifications" class="hidden">
+      <div class="container narrow">
+        <div class="page-title">
+          <h2>🔔 알림</h2>
+          <button class="btn-submit small" onclick="markAllNotifRead()">모두 읽음</button>
+        </div>
+        <div id="notifications-container"><div class="loading">불러오는 중...</div></div>
+      </div>
+    </main>
+
+    <input type="file" id="image-upload-input" accept="image/*" style="display:none" onchange="handleImageUpload(event, this.getAttribute('data-textarea'))">
     <script src="app.js"></script>
   </body>
 </html>

@@ -7,6 +7,8 @@ let currentUser = null;
 let currentProfileUsername = "";
 let dialogResolve = null;
 let chatSocket = null;
+let notifSocket = null;
+let notifList = [];
 
 function getToken() {
   return localStorage.getItem("token");
@@ -17,15 +19,16 @@ function setToken(token) {
   else localStorage.removeItem("token");
 }
 
-function apiHeaders() {
-  const headers = { "Content-Type": "application/json" };
+function apiHeaders(body) {
+  const headers = {};
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (!(body instanceof FormData)) headers["Content-Type"] = "application/json";
   return headers;
 }
 
 function authFetch(url, options) {
-  return fetch(url, { ...options, headers: { ...apiHeaders(), ...options?.headers } });
+  return fetch(url, { ...options, headers: { ...apiHeaders(options?.body), ...options?.headers } });
 }
 
 function updateHeader() {
@@ -33,15 +36,18 @@ function updateHeader() {
   const usernameEl = document.getElementById("header-username");
   const loginBtn = document.getElementById("btn-login");
   const chatBtn = document.getElementById("btn-chat");
+  const notifBtn = document.getElementById("btn-notif");
   if (currentUser) {
     usernameEl.textContent = currentUser.username;
     userArea.classList.remove("hidden");
     loginBtn.classList.add("hidden");
     chatBtn.classList.remove("hidden");
+    notifBtn.classList.remove("hidden");
   } else {
     userArea.classList.add("hidden");
     loginBtn.classList.remove("hidden");
     chatBtn.classList.add("hidden");
+    notifBtn.classList.add("hidden");
   }
   const detailView = document.getElementById("view-detail");
   if (detailView && !detailView.classList.contains("hidden")) {
@@ -63,6 +69,64 @@ function insertMd(textareaId, before, after) {
   ta.focus();
   const pos = start + before.length + (after ? 0 : 0);
   ta.setSelectionRange(start + before.length, start + before.length + selected.length);
+}
+
+function insertLink(textareaId) {
+  const ta = document.getElementById(textareaId);
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const selected = ta.value.substring(start, end);
+  showPromptModal("링크 URL을 입력하세요", "https://...").then(url => {
+    if (!url) return;
+    showPromptModal("링크 텍스트를 입력하세요", selected || "링크").then(text => {
+      if (!text) text = url;
+      const insertion = `[${text}](${url})`;
+      ta.value = ta.value.substring(0, start) + insertion + ta.value.substring(end);
+      ta.focus();
+      ta.setSelectionRange(start + insertion.length, start + insertion.length);
+    });
+  });
+}
+
+function handleImageUpload(event, textareaId) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  const ta = document.getElementById(textareaId);
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  authFetch("/api/upload", { method: "POST", body: (() => { const fd = new FormData(); fd.append("image", file); return fd; })() })
+    .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e.error)); return r.json(); })
+    .then(data => {
+      const alt = file.name.replace(/\.[^.]+$/, "") || "image";
+      const insertion = `![${alt}](${data.url})`;
+      ta.value = ta.value.substring(0, start) + insertion + ta.value.substring(end);
+      ta.focus();
+      ta.setSelectionRange(start + insertion.length, start + insertion.length);
+    })
+    .catch(err => showAlertModal(typeof err === "string" ? err : "이미지 업로드에 실패했습니다."));
+}
+
+function insertImage(textareaId) {
+  const ta = document.getElementById(textareaId);
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const selected = ta.value.substring(start, end);
+  showConfirmModal("이미지 업로드", "파일을 업로드하시겠습니까?\n취소하면 URL을 직접 입력할 수 있습니다.").then(upload => {
+    if (upload) {
+      const input = document.getElementById("image-upload-input");
+      input.setAttribute("data-textarea", textareaId);
+      input.click();
+    } else {
+      showPromptModal("이미지 URL을 입력하세요", "https://...").then(url => {
+        if (!url) return;
+        showPromptModal("대체 텍스트(alt)를 입력하세요", selected || "이미지").then(alt => {
+          if (!alt) alt = "이미지";
+          const insertion = `![${alt}](${url})`;
+          ta.value = ta.value.substring(0, start) + insertion + ta.value.substring(end);
+          ta.focus();
+          ta.setSelectionRange(start + insertion.length, start + insertion.length);
+        });
+      });
+    }
+  });
 }
 
 function renderMd(text) {
@@ -235,7 +299,7 @@ function login() {
   errorEl.classList.add("hidden");
   fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) })
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e.error)); return r.json(); })
-    .then(data => { setToken(data.token); currentUser = data.user; updateHeader(); updateFormUsername(); hideAuthModal(); })
+    .then(data => { setToken(data.token); currentUser = data.user; updateHeader(); updateFormUsername(); hideAuthModal(); connectNotifSocket(); updateNotifBadge(); })
     .catch(err => { errorEl.textContent = typeof err === "string" ? err : "로그인에 실패했습니다"; errorEl.classList.remove("hidden"); });
 }
 
@@ -250,23 +314,45 @@ function signup() {
   errorEl.classList.add("hidden");
   fetch("/api/auth/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) })
     .then(r => { if (!r.ok) return r.json().then(e => Promise.reject(e.error)); return r.json(); })
-    .then(data => { setToken(data.token); currentUser = data.user; updateHeader(); updateFormUsername(); hideAuthModal(); })
+    .then(data => { setToken(data.token); currentUser = data.user; updateHeader(); updateFormUsername(); hideAuthModal(); connectNotifSocket(); updateNotifBadge(); })
     .catch(err => { errorEl.textContent = typeof err === "string" ? err : "회원가입에 실패했습니다"; errorEl.classList.remove("hidden"); });
 }
 
 function logout() {
   if (chatSocket) { chatSocket.disconnect(); chatSocket = null; }
+  if (notifSocket) { notifSocket.disconnect(); notifSocket = null; }
   currentUser = null; setToken(null); updateHeader(); updateFormUsername();
+  document.getElementById("notif-badge").classList.add("hidden");
+}
+
+function connectNotifSocket() {
+  if (notifSocket) { notifSocket.disconnect(); notifSocket = null; }
+  const token = getToken();
+  if (!token) return;
+  notifSocket = io({ query: { token }, transports: ["websocket", "polling"] });
+  notifSocket.on("new-notification", (data) => {
+    const inChatRoom = !document.getElementById("view-chat-room").classList.contains("hidden");
+    if (data.type === "chat" && data.related_room_id === currentRoomId && inChatRoom) return;
+    updateNotifBadge();
+    if (!document.getElementById("view-notifications").classList.contains("hidden")) {
+      loadNotifications();
+    }
+  });
 }
 
 function restoreSession() {
-  const token = getToken();
-  if (!token) { updateHeader(); updateFormUsername(); return; }
-  fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
-    .then(r => r.json()).then(data => {
-      if (data.user) currentUser = data.user; else setToken(null);
-      updateHeader(); updateFormUsername();
-    }).catch(() => { setToken(null); updateHeader(); updateFormUsername(); });
+  return new Promise(resolve => {
+    const token = getToken();
+    if (!token) { updateHeader(); updateFormUsername(); resolve(); return; }
+    fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(data => {
+        if (data.user) currentUser = data.user; else setToken(null);
+        updateHeader(); updateFormUsername();
+        connectNotifSocket();
+        updateNotifBadge();
+        resolve();
+      }).catch(() => { setToken(null); updateHeader(); updateFormUsername(); resolve(); });
+  });
 }
 
 function loadCategories(selectId) {
@@ -356,7 +442,7 @@ function showProfile(username) {
 }
 
 function hideAllViews() {
-  ["view-list", "view-write", "view-detail", "view-edit", "view-profile", "view-chat", "view-chat-room"].forEach(id => {
+  ["view-list", "view-write", "view-detail", "view-edit", "view-profile", "view-chat", "view-chat-room", "view-notifications"].forEach(id => {
     document.getElementById(id).classList.add("hidden");
   });
 }
@@ -966,6 +1052,77 @@ function startChat(username) {
     .catch(err => showAlertModal(typeof err === "string" ? err : "채팅방을 생성할 수 없습니다."));
 }
 
+function showNotifications() {
+  hideAllViews();
+  document.getElementById("view-notifications").classList.remove("hidden");
+  loadNotifications();
+  updateHash();
+}
+
+function loadNotifications() {
+  const container = document.getElementById("notifications-container");
+  container.innerHTML = '<div class="loading">불러오는 중...</div>';
+  authFetch("/api/notifications").then(r => r.json()).then(data => {
+    notifList = data.notifications;
+    if (notifList.length === 0) {
+      container.innerHTML = '<div class="empty">알림이 없습니다.</div>';
+      return;
+    }
+    container.innerHTML = notifList.map((n, i) => `
+      <div class="notif-item ${n.is_read ? '' : 'notif-unread'}" onclick="clickNotif(${i})">
+        <div class="notif-icon">${n.type === 'comment' ? '💬' : n.type === 'like' ? '👍' : '💬'}</div>
+        <div class="notif-body">
+          <div class="notif-msg">${escHtml(n.message)}</div>
+          <div class="notif-time">${formatDate(n.created_at)}</div>
+        </div>
+        ${n.is_read ? '' : '<div class="notif-dot"></div>'}
+      </div>
+    `).join("");
+  }).catch(() => { container.innerHTML = '<div class="empty error-msg">알림을 불러오지 못했습니다.</div>'; });
+}
+
+function clickNotif(index) {
+  const n = notifList[index];
+  if (!n) return;
+  if (!n.is_read) {
+    authFetch("/api/notifications/read", { method: "POST", body: JSON.stringify({ id: n.id }) });
+    const badge = document.getElementById("notif-badge");
+    if (!badge.classList.contains("hidden")) {
+      const count = parseInt(badge.textContent) - 1;
+      if (count <= 0) { badge.classList.add("hidden"); badge.textContent = "0"; }
+      else badge.textContent = count > 99 ? "99+" : count;
+    }
+  }
+  if (n.related_post_id) { showDetail(n.related_post_id); return; }
+  if (n.related_room_id) { showChatRoom(n.related_room_id); return; }
+  showNotifications();
+}
+
+function markAllNotifRead() {
+  authFetch("/api/notifications/read-all", { method: "POST" }).then(() => {
+    document.querySelectorAll(".notif-unread").forEach(el => {
+      el.classList.remove("notif-unread");
+      const dot = el.querySelector(".notif-dot");
+      if (dot) dot.remove();
+    });
+    document.getElementById("notif-badge").classList.add("hidden");
+    document.getElementById("notif-badge").textContent = "0";
+  }).catch(() => {});
+}
+
+function updateNotifBadge() {
+  if (!currentUser) { document.getElementById("notif-badge").classList.add("hidden"); return; }
+  authFetch("/api/notifications/unread-count").then(r => r.json()).then(data => {
+    const badge = document.getElementById("notif-badge");
+    if (data.count > 0) {
+      badge.textContent = data.count > 99 ? "99+" : data.count;
+      badge.classList.remove("hidden");
+    } else {
+      badge.classList.add("hidden");
+    }
+  }).catch(() => {});
+}
+
 function updateHash() {
   if (updatingHash) return;
   const view = document.querySelector("main:not(.hidden)");
@@ -993,6 +1150,8 @@ function updateHash() {
   } else if (id === "view-chat-room" && currentRoomId) {
     const title = document.getElementById("chat-room-title").textContent.replace("💬 ", "");
     hash = "#chat-room/" + currentRoomId + (title ? "/" + encodeURIComponent(title) : "");
+  } else if (id === "view-notifications") {
+    hash = "#notifications";
   }
   if (hash && location.hash !== hash) {
     updatingHash = true;
@@ -1028,6 +1187,7 @@ function loadFromHash() {
     if (username) { showProfile(username); return; }
   }
   if (hash === "#chat") { showChatList(); return; }
+  if (hash === "#notifications") { showNotifications(); return; }
   if (hash.startsWith("#chat-room/")) {
     const parts = hash.split("/");
     const roomId = parseInt(parts[1]);
@@ -1043,8 +1203,8 @@ function loadFromHash() {
 
 let updatingHash = false;
 
-document.addEventListener("DOMContentLoaded", () => {
-  restoreSession();
+document.addEventListener("DOMContentLoaded", async () => {
+  await restoreSession();
   if (location.hash) {
     loadFromHash();
   } else {
