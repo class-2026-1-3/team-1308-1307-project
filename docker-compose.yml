@@ -6,8 +6,8 @@ services:
     volumes:
       - db_data:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=13071308
-      - MYSQL_DATABASE=study
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -22,12 +22,13 @@ services:
       db:
         condition: service_healthy
     environment:
-      - DB_HOST=db
-      - DB_USER=root
-      - DB_PASSWORD=13071308
-      - DB_NAME=study
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin123
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
 
 volumes:
   db_data:
