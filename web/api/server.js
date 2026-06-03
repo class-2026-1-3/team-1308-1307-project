@@ -3,6 +3,8 @@ const mysql = require("mysql2");
 const path = require("path");
 const fs = require("fs");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const http = require("http");
@@ -20,7 +22,37 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 
 app.use(cors());
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "https:"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "cdn.jsdelivr.net"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "cdn.jsdelivr.net"],
+      styleSrcAttr: ["'unsafe-inline'"],
+      fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", CLIENT_URL, "http://localhost:3000", "http://127.0.0.1:3000", "https:", "wss:"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      baseUri: ["'self'"],
+      objectSrc: ["'none'"],
+    },
+  },
+}));
 app.use(express.json({ limit: "1mb" }));
+
+const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: "너무 많은 요청입니다. 잠시 후 다시 시도하세요." } });
+const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 200, message: { error: "너무 많은 요청입니다." } });
+const uploadLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: "업로드는 1분에 10번만 가능합니다." } });
+app.use("/api/auth", authLimiter);
+app.use("/api/upload", uploadLimiter);
+app.use("/api", apiLimiter);
+
 app.use(express.static(path.join(__dirname, "../src")));
 
 const uploadDir = path.join(__dirname, "..", "uploads");
@@ -90,9 +122,13 @@ function runMigration() {
     { table: "posts", col: "category_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL" },
     { table: "posts", col: "views", def: "INT DEFAULT 0" },
     { table: "posts", col: "is_pinned", def: "TINYINT(1) DEFAULT 0" },
+    { table: "users", col: "email", def: "VARCHAR(100) DEFAULT NULL" },
+  ];
+  const alterUnique = [
+    { table: "users", col: "email", constraint: "UNIQUE KEY unique_email (email)" },
   ];
   function run(i) {
-    if (i >= migrations.length) return;
+    if (i >= migrations.length) { runAlterUnique(0); return; }
     const m = migrations[i];
     if (typeof m === "string") {
       db.query(m, (err) => {
@@ -120,7 +156,32 @@ function runMigration() {
       );
     }
   }
+  function runAlterUnique(i) {
+    if (i >= alterUnique.length) return;
+    const m = alterUnique[i];
+    db.query(
+      `SELECT COUNT(*) AS cnt FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'UNIQUE'`,
+      [dbName, m.table, `unique_${m.col}`],
+      (err, result) => {
+        if (err) { console.error(`제약 조건 확인 실패 (${m.table}.${m.col}):`, err.message); return runAlterUnique(i + 1); }
+        if (result[0].cnt === 0) {
+          db.query(`ALTER TABLE ${m.table} ADD ${m.constraint}`, (err) => {
+            if (err) console.error(`고유 제약 추가 실패 (${m.table}.${m.col}):`, err.message);
+            else console.log(`고유 제약 추가 완료: ${m.table}.${m.col}`);
+            runAlterUnique(i + 1);
+          });
+        } else {
+          runAlterUnique(i + 1);
+        }
+      }
+    );
+  }
   run(0);
+}
+
+function sanitize(str) {
+  if (typeof str !== "string") return "";
+  return str.replace(/[<>]/g, "").trim();
 }
 
 function seedAdmin() {
@@ -209,36 +270,53 @@ function canModifyComment(comment, user) {
 }
 
 app.post("/api/auth/signup", (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, email } = req.body;
   if (!username || !username.trim())
     return res.status(400).json({ error: "닉네임을 입력하세요" });
   if (!password || password.length < 4)
     return res.status(400).json({ error: "비밀번호는 4자 이상 입력하세요" });
+  if (!email || !email.trim())
+    return res.status(400).json({ error: "이메일을 입력하세요" });
 
-  const name = username.trim();
+  const name = sanitize(username);
+  if (name.length > 30)
+    return res.status(400).json({ error: "닉네임은 30자 이내로 입력하세요" });
+  if (!/^[가-힣a-zA-Z0-9_.-]+$/.test(name))
+    return res.status(400).json({ error: "닉네임은 한글, 영문, 숫자, _, ., -만 사용 가능합니다" });
+
+  const emailRegex = /^[^\s@]+@bssm\.hs\.kr$/;
+  if (!emailRegex.test(email.trim()))
+    return res.status(400).json({ error: "@bssm.hs.kr 이메일만 가입 가능합니다" });
+  const userEmail = email.trim().toLowerCase();
   db.query("SELECT id, password_hash FROM users WHERE username = ?", [name], (err, users) => {
     if (err) return res.status(500).json({ error: err.message });
     if (users.length > 0 && users[0].password_hash)
       return res.status(409).json({ error: "이미 가입된 닉네임입니다" });
 
-    bcrypt.hash(password, 10, (err, hash) => {
+    db.query("SELECT id FROM users WHERE email = ?", [userEmail], (err, emailUsers) => {
       if (err) return res.status(500).json({ error: err.message });
-      const finish = (userId) => {
-        const isAdmin = isAdminUser(name);
-        const token = jwt.sign({ id: userId, username: name, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
-        res.status(201).json({ token, user: { id: userId, username: name, isAdmin } });
-      };
-      if (users.length > 0) {
-        db.query("UPDATE users SET password_hash = ? WHERE id = ?", [hash, users[0].id], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-          finish(users[0].id);
-        });
-      } else {
-        db.query("INSERT INTO users (username, password_hash) VALUES (?, ?)", [name, hash], (err, result) => {
-          if (err) return res.status(500).json({ error: err.message });
-          finish(result.insertId);
-        });
-      }
+      if (emailUsers.length > 0)
+        return res.status(409).json({ error: "이미 가입된 이메일입니다" });
+
+      bcrypt.hash(password, 10, (err, hash) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const finish = (userId) => {
+          const isAdmin = isAdminUser(name);
+          const token = jwt.sign({ id: userId, username: name, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
+          res.status(201).json({ token, user: { id: userId, username: name, email: userEmail, isAdmin } });
+        };
+        if (users.length > 0) {
+          db.query("UPDATE users SET password_hash = ?, email = ? WHERE id = ?", [hash, userEmail, users[0].id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            finish(users[0].id);
+          });
+        } else {
+          db.query("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)", [name, hash, userEmail], (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            finish(result.insertId);
+          });
+        }
+      });
     });
   });
 });
@@ -251,8 +329,8 @@ app.post("/api/auth/login", (req, res) => {
     return res.status(400).json({ error: "비밀번호를 입력하세요" });
 
   db.query(
-    "SELECT id, username, password_hash FROM users WHERE username = ?",
-    [username.trim()],
+    "SELECT id, username, email, password_hash FROM users WHERE username = ?",
+    [sanitize(username)],
     (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
       if (users.length === 0)
@@ -266,14 +344,18 @@ app.post("/api/auth/login", (req, res) => {
           return res.status(401).json({ error: "닉네임 또는 비밀번호가 일치하지 않습니다" });
         const isAdmin = isAdminUser(user.username);
         const token = jwt.sign({ id: user.id, username: user.username, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
-        res.json({ token, user: { id: user.id, username: user.username, isAdmin } });
+        res.json({ token, user: { id: user.id, username: user.username, email: user.email, isAdmin } });
       });
     }
   );
 });
 
 app.get("/api/auth/me", authenticate, (req, res) => {
-  res.json({ user: req.user || null });
+  if (!req.user) return res.json({ user: null });
+  db.query("SELECT id, username, email, created_at FROM users WHERE id = ?", [req.user.id], (err, users) => {
+    if (err || users.length === 0) return res.json({ user: { id: req.user.id, username: req.user.username, email: null, isAdmin: req.user.isAdmin } });
+    res.json({ user: { id: users[0].id, username: users[0].username, email: users[0].email, isAdmin: req.user.isAdmin } });
+  });
 });
 
 app.get("/api/categories", (req, res) => {
@@ -400,7 +482,8 @@ app.get("/api/posts/:id", authenticate, (req, res) => {
 
 app.post("/api/posts", authenticate, requireAuth, (req, res) => {
   const { title, content, category_id } = req.body;
-  if (!title || !title.trim())
+  const cleanTitle = sanitize(title || "");
+  if (!cleanTitle)
     return res.status(400).json({ error: "제목을 입력하세요" });
   if (!content || !content.trim())
     return res.status(400).json({ error: "내용을 입력하세요" });
@@ -408,7 +491,7 @@ app.post("/api/posts", authenticate, requireAuth, (req, res) => {
   const catId = category_id ? parseInt(category_id) : null;
   db.query(
     "INSERT INTO posts (user_id, title, content, category_id) VALUES (?, ?, ?, ?)",
-    [req.user.id, title.trim(), content.trim(), catId],
+    [req.user.id, cleanTitle, content.trim(), catId],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ id: result.insertId });
@@ -418,7 +501,8 @@ app.post("/api/posts", authenticate, requireAuth, (req, res) => {
 
 app.put("/api/posts/:id", authenticate, requireAuth, (req, res) => {
   const { title, content, category_id } = req.body;
-  if (!title || !title.trim())
+  const cleanTitle = sanitize(title || "");
+  if (!cleanTitle)
     return res.status(400).json({ error: "제목을 입력하세요" });
   if (!content || !content.trim())
     return res.status(400).json({ error: "내용을 입력하세요" });
@@ -435,7 +519,7 @@ app.put("/api/posts/:id", authenticate, requireAuth, (req, res) => {
         return res.status(403).json({ error: "작성자만 수정할 수 있습니다" });
       const catId = category_id ? parseInt(category_id) : null;
       db.query("UPDATE posts SET title = ?, content = ?, category_id = ? WHERE id = ?",
-        [title.trim(), content.trim(), catId, req.params.id], (err) => {
+        [cleanTitle, content.trim(), catId, req.params.id], (err) => {
           if (err) return res.status(500).json({ error: err.message });
           res.json({ message: "수정 완료" });
         });
@@ -556,7 +640,7 @@ app.get("/api/users/:username/posts", (req, res) => {
 
 app.get("/api/users/:username", authenticate, (req, res) => {
   db.query(
-    "SELECT id, username, created_at FROM users WHERE username = ?",
+    "SELECT id, username, email, created_at FROM users WHERE username = ?",
     [req.params.username],
     (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -696,12 +780,13 @@ app.put("/api/auth/password", authenticate, requireAuth, (req, res) => {
 
 app.post("/api/posts/:id/comments", authenticate, requireAuth, (req, res) => {
   const { content } = req.body;
-  if (!content || !content.trim())
+  const cleanContent = sanitize(content || "");
+  if (!cleanContent)
     return res.status(400).json({ error: "댓글 내용을 입력하세요" });
 
   db.query(
     "INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)",
-    [req.params.id, req.user.id, content.trim()],
+    [req.params.id, req.user.id, cleanContent],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       const commentId = result.insertId;
@@ -865,7 +950,8 @@ app.get("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, res
 
 app.post("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, res) => {
   const { content } = req.body;
-  if (!content || !content.trim())
+  const cleanContent = sanitize(content || "");
+  if (!cleanContent)
     return res.status(400).json({ error: "메시지를 입력하세요" });
 
   db.query(
@@ -877,7 +963,7 @@ app.post("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, re
 
       db.query(
         "INSERT INTO chat_messages (room_id, user_id, content) VALUES (?, ?, ?)",
-        [req.params.roomId, req.user.id, content.trim()],
+        [req.params.roomId, req.user.id, cleanContent],
         (err, result) => {
           if (err) return res.status(500).json({ error: err.message });
           const newMsg = { id: result.insertId, content: content.trim(), user_id: req.user.id, username: req.user.username, created_at: new Date() };

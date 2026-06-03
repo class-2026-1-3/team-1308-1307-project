@@ -108,6 +108,17 @@
         </div>
         <div id="auth-signup" class="auth-form hidden">
           <div class="form-group">
+            <label>이메일 (@bssm.hs.kr)</label>
+            <input
+              type="email"
+              id="signup-email"
+              placeholder="example@bssm.hs.kr"
+              onkeydown="
+                if (event.key === 'Enter' && !event.isComposing) signup();
+              "
+            />
+          </div>
+          <div class="form-group">
             <label>닉네임</label>
             <input
               type="text"
@@ -142,6 +153,7 @@
           </div>
           <div id="signup-error" class="auth-error hidden"></div>
           <button class="btn-submit full" onclick="signup()">회원가입</button>
+          <div class="auth-note">※ @bssm.hs.kr 이메일로만 가입 가능합니다</div>
         </div>
       </div>
     </div>

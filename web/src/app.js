@@ -416,12 +416,28 @@ function login() {
 }
 
 function signup() {
+  const email = document.getElementById("signup-email").value.trim();
   const username = document.getElementById("signup-username").value.trim();
   const password = document.getElementById("signup-password").value;
   const confirm = document.getElementById("signup-password-confirm").value;
   const errorEl = document.getElementById("signup-error");
-  if (!username || !password || !confirm) {
+  if (!email || !username || !password || !confirm) {
     errorEl.textContent = "모든 항목을 입력하세요";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  if (!email.endsWith("@bssm.hs.kr")) {
+    errorEl.textContent = "@bssm.hs.kr 이메일만 가입 가능합니다";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  if (username.length > 30) {
+    errorEl.textContent = "닉네임은 30자 이내로 입력하세요";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  if (!/^[가-힣a-zA-Z0-9_.-]+$/.test(username)) {
+    errorEl.textContent = "닉네임은 한글, 영문, 숫자, _, ., -만 사용 가능합니다";
     errorEl.classList.remove("hidden");
     return;
   }
@@ -439,7 +455,7 @@ function signup() {
   fetch("/api/auth/signup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, email }),
   })
     .then((r) => {
       if (!r.ok) return r.json().then((e) => Promise.reject(e.error));
@@ -519,8 +535,11 @@ function restoreSession() {
     fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((data) => {
-        if (data.user) currentUser = data.user;
-        else setToken(null);
+        if (data.user) {
+          currentUser = data.user;
+        } else {
+          setToken(null);
+        }
         updateHeader();
         updateFormUsername();
         connectNotifSocket();
@@ -1324,6 +1343,7 @@ function loadSettingsInfo(username) {
     .then((user) => {
       document.getElementById("settings-userinfo").innerHTML = `
       <div class="settings-info-row"><span class="settings-info-label">닉네임</span><span class="settings-info-value">${escHtml(user.username)} ${user.is_admin ? '<span class="admin-badge">관리자</span>' : ""}</span></div>
+      <div class="settings-info-row"><span class="settings-info-label">이메일</span><span class="settings-info-value">${escHtml(user.email || "등록되지 않음")}</span></div>
       <div class="settings-info-row"><span class="settings-info-label">가입일</span><span class="settings-info-value">${formatDate(user.created_at)}</span></div>
       <div class="settings-info-row"><span class="settings-info-label">작성 글</span><span class="settings-info-value">${user.post_count}개</span></div>
       <div class="settings-info-row"><span class="settings-info-label">작성 댓글</span><span class="settings-info-value">${user.comment_count}개</span></div>
