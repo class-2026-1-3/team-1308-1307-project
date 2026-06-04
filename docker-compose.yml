@@ -8,6 +8,8 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
+    networks:
+      - bssm_net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
@@ -21,6 +23,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       - DB_HOST=${DB_HOST}
       - DB_USER=${DB_USER}
@@ -29,6 +34,12 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - bssm_net
+
+networks:
+  bssm_net:
+    driver: bridge
 
 volumes:
   db_data:

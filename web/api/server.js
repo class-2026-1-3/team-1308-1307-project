@@ -20,9 +20,9 @@ const port = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "teamP-community-secret-key-2026";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
 app.use(cors());
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -302,16 +302,18 @@ app.post("/api/auth/signup", (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         const finish = (userId) => {
           const isAdmin = isAdminUser(name);
-          const token = jwt.sign({ id: userId, username: name, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
-          res.status(201).json({ token, user: { id: userId, username: name, email: userEmail, isAdmin } });
+          const jwtToken = jwt.sign({ id: userId, username: name, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
+          res.status(201).json({ token: jwtToken, user: { id: userId, username: name, email: userEmail, isAdmin } });
         };
         if (users.length > 0) {
-          db.query("UPDATE users SET password_hash = ?, email = ? WHERE id = ?", [hash, userEmail, users[0].id], (err) => {
+          db.query("UPDATE users SET password_hash = ?, email = ? WHERE id = ?",
+            [hash, userEmail, users[0].id], (err) => {
             if (err) return res.status(500).json({ error: err.message });
             finish(users[0].id);
           });
         } else {
-          db.query("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)", [name, hash, userEmail], (err, result) => {
+          db.query("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            [name, hash, userEmail], (err, result) => {
             if (err) return res.status(500).json({ error: err.message });
             finish(result.insertId);
           });
