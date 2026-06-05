@@ -1,4 +1,5 @@
 let currentPostId = null;
+let currentReplyTo = null;
 let currentPage = 1;
 let currentSearch = "";
 let currentSort = "latest";
@@ -34,23 +35,42 @@ function authFetch(url, options) {
   });
 }
 
+function toggleDark() {
+  document.documentElement.classList.toggle("dark");
+  const isDark = document.documentElement.classList.contains("dark");
+  localStorage.setItem("darkMode", isDark ? "1" : "0");
+  const btn = document.getElementById("btn-dark");
+  if (btn) btn.textContent = isDark ? "☀️" : "🌙";
+}
+
+function applyDark() {
+  if (localStorage.getItem("darkMode") === "1") {
+    document.documentElement.classList.add("dark");
+    const btn = document.getElementById("btn-dark");
+    if (btn) btn.textContent = "☀️";
+  }
+}
+
 function updateHeader() {
   const userArea = document.getElementById("header-user");
   const usernameEl = document.getElementById("header-username");
   const loginBtn = document.getElementById("btn-login");
   const chatBtn = document.getElementById("btn-chat");
   const notifBtn = document.getElementById("btn-notif");
+  const bmBtn = document.getElementById("btn-bookmark-header");
   if (currentUser) {
-    usernameEl.textContent = currentUser.username;
+    usernameEl.innerHTML = avatarHtml(currentUser.avatar, currentUser.username, 28) + escHtml(currentUser.username);
     userArea.classList.remove("hidden");
     loginBtn.classList.add("hidden");
     chatBtn.classList.remove("hidden");
     notifBtn.classList.remove("hidden");
+    if (bmBtn) bmBtn.classList.remove("hidden");
   } else {
     userArea.classList.add("hidden");
     loginBtn.classList.remove("hidden");
     chatBtn.classList.add("hidden");
     notifBtn.classList.add("hidden");
+    if (bmBtn) bmBtn.classList.add("hidden");
   }
   const detailView = document.getElementById("view-detail");
   if (detailView && !detailView.classList.contains("hidden")) {
@@ -616,11 +636,30 @@ function showWrite() {
   }
   hideAllViews();
   document.getElementById("view-write").classList.remove("hidden");
-  document.getElementById("write-title").value = "";
-  document.getElementById("write-content").value = "";
+  const draftTitle = localStorage.getItem("draft_title") || "";
+  const draftContent = localStorage.getItem("draft_content") || "";
+  document.getElementById("write-title").value = draftTitle;
+  document.getElementById("write-content").value = draftContent;
+  document.getElementById("write-tags").value = "";
   loadCategories("write-category");
+  if (draftTitle || draftContent) {
+    showToast("임시 저장된 글을 불러왔습니다.", "");
+  }
   updateHash();
 }
+
+function autoSaveDraft() {
+  const title = document.getElementById("write-title");
+  const content = document.getElementById("write-content");
+  if (title && content) {
+    if (title.value || content.value) {
+      localStorage.setItem("draft_title", title.value);
+      localStorage.setItem("draft_content", content.value);
+    }
+  }
+}
+
+setInterval(autoSaveDraft, 10000);
 
 function showDetail(id) {
   currentPostId = id;
@@ -641,6 +680,8 @@ function showEdit(id) {
     .then((post) => {
       document.getElementById("edit-title").value = post.title;
       document.getElementById("edit-content").value = post.content;
+      const tagsEl = document.getElementById("edit-tags");
+      if (tagsEl && post.tags) tagsEl.value = post.tags;
       loadCategories("edit-category");
       const sel = document.getElementById("edit-category");
       fetch("/api/categories")
@@ -672,9 +713,17 @@ function hideAllViews() {
     "view-chat",
     "view-chat-room",
     "view-notifications",
+    "view-bookmarks",
   ].forEach((id) => {
     document.getElementById(id).classList.add("hidden");
   });
+}
+
+function avatarHtml(url, username, size) {
+  const s = size || 32;
+  if (url && url.startsWith("/uploads/")) return `<img src="${url}" class="avatar-img" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`;
+  const letter = username ? username.charAt(0).toUpperCase() : "?";
+  return `<span class="avatar-letter" style="display:inline-flex;align-items:center;justify-content:center;width:${s}px;height:${s}px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:${s*0.45}px;vertical-align:middle;margin-right:6px;flex-shrink:0;">${letter}</span>`;
 }
 
 function formatDate(str) {
@@ -745,8 +794,10 @@ function loadPosts(page) {
           </div>
           <div class="post-item-meta">
             ${memberBadge(post.is_member)}
+            ${avatarHtml(post.avatar, post.username, 20)}
             <span onclick="event.stopPropagation();showProfile('${escHtml(post.username)}')" class="username-link">${escHtml(post.username || "익명")}</span>
             ${post.category_name ? `<span class="category-label">${post.category_name}</span>` : ""}
+            ${post.tags ? post.tags.split(",").map(t => `<span class="tag-label">${escHtml(t.trim())}</span>`).join("") : ""}
             &nbsp;·&nbsp;${formatDate(post.created_at)}
             &nbsp;·&nbsp;조회 ${post.views}
             &nbsp;·&nbsp;👍 ${post.like_count}
@@ -814,15 +865,18 @@ function loadPost(id) {
   fetch(`/api/posts/${id}`)
     .then((r) => r.json())
     .then((post) => {
+      const hashtags = post.tags ? post.tags.split(",").map(t => escHtml(t.trim())).filter(Boolean) : [];
       detail.innerHTML = `
       <div class="post-card">
         <div class="post-card-title">${post.is_pinned ? '<span class="pin-badge">📌</span> ' : ""}${escHtml(post.title)}</div>
         <div class="post-card-meta">
           ${memberBadge(post.is_member)}
+          ${avatarHtml(post.avatar, post.username, 24)}
           <span onclick="showProfile('${escHtml(post.username)}')" class="username-link">${escHtml(post.username || "익명")}</span>
           ${post.category_name ? `<span class="category-label">${post.category_name}</span>` : ""}
           &nbsp;·&nbsp;${formatDate(post.created_at)}
           &nbsp;·&nbsp;조회 ${post.views}
+          ${hashtags.length ? `&nbsp;·&nbsp;${hashtags.map(t => `<span class="tag-label">${t}</span>`).join(" ")}` : ""}
         </div>
         <div class="post-card-content md-content">${renderMd(post.content)}</div>
       </div>
@@ -830,33 +884,25 @@ function loadPost(id) {
 
       const cList = post.comments || [];
       document.getElementById("comment-count").textContent = cList.length;
-      comments.innerHTML =
-        cList.length === 0
-          ? '<div class="empty">아직 댓글이 없습니다.</div>'
-          : cList
-              .map(
-                (c) => `
-        <div class="comment-item">
-          <div class="comment-item-body">
-            <div class="comment-item-header">
-              <span class="comment-username">${memberBadge(c.is_member)}<span onclick="showProfile('${escHtml(c.username)}')" class="username-link">${escHtml(c.username || "익명")}</span></span>
-              <span class="comment-date">${formatDate(c.created_at)}</span>
-            </div>
-            <div class="comment-content">${escHtml(c.content)}</div>
-          </div>
-          <button class="comment-delete-btn" onclick="deleteComment(${c.id})" title="삭제">✕</button>
-        </div>
-      `,
-              )
-              .join("");
+      const parents = cList.filter(c => !c.parent_id);
+      const children = cList.filter(c => c.parent_id);
+      comments.innerHTML = cList.length === 0
+        ? '<div class="empty">아직 댓글이 없습니다.</div>'
+        : parents.map(p => {
+            const replies = children.filter(c => c.parent_id === p.id);
+            return renderComment(p) + (replies.length ? replies.map(r => `<div class="comment-reply">${renderComment(r)}</div>`).join("") : "");
+          }).join("");
 
       document.getElementById("like-count").textContent = post.like_count || 0;
       const likeIcon = document.getElementById("like-icon");
       likeIcon.textContent = post.hasLiked ? "♥" : "♡";
       likeIcon.style.color = post.hasLiked ? "var(--red)" : "var(--text2)";
-      document
-        .getElementById("btn-like")
-        .classList.toggle("liked", post.hasLiked);
+      document.getElementById("btn-like").classList.toggle("liked", post.hasLiked);
+
+      const bmIcon = document.getElementById("bookmark-icon");
+      if (bmIcon) {
+        bmIcon.textContent = post.hasBookmarked ? "🔖" : "🏷️";
+      }
 
       const pinBtn = document.getElementById("btn-pin");
       if (isCurrentUserAdmin()) {
@@ -919,6 +965,72 @@ function togglePin() {
     );
 }
 
+function renderComment(c) {
+  const canDel = currentUser && (currentUser.id === c.user_id || isCurrentUserAdmin());
+  return `
+<div class="comment-item">
+  <div class="comment-item-body">
+    <div class="comment-item-header">
+      <span class="comment-username">${memberBadge(c.is_member)}${avatarHtml(c.avatar, c.username, 20)}<span onclick="showProfile('${escHtml(c.username)}')" class="username-link">${escHtml(c.username || "익명")}</span></span>
+      <span class="comment-date">${formatDate(c.created_at)}</span>
+    </div>
+    <div class="comment-content">${escHtml(c.content)}</div>
+    <div class="comment-actions">
+      <button class="btn-text small" onclick="replyToComment(${c.id},'${escHtml(c.username)}')">💬 답글</button>
+    </div>
+  </div>
+  ${canDel ? `<button class="comment-delete-btn" onclick="deleteComment(${c.id})" title="삭제">✕</button>` : ""}
+</div>`;
+}
+
+function replyToComment(commentId, username) {
+  currentReplyTo = commentId;
+  const form = document.getElementById("comment-form");
+  const input = document.getElementById("comment-content");
+  input.focus();
+  const existing = form.querySelector(".reply-notice");
+  if (existing) existing.remove();
+  const notice = document.createElement("div");
+  notice.className = "reply-notice";
+  notice.innerHTML = `💬 <strong>${escHtml(username)}</strong>님에게 답글 작성 중 <button class="btn-text small" onclick="cancelReply()">취소</button>`;
+  form.insertBefore(notice, form.firstChild);
+}
+
+function cancelReply() {
+  currentReplyTo = null;
+  const notice = document.querySelector(".reply-notice");
+  if (notice) notice.remove();
+}
+
+function toggleBookmark() {
+  if (!currentUser) { showAlertModal("로그인이 필요합니다"); return; }
+  authFetch(`/api/bookmarks/${currentPostId}`, { method: "POST" })
+    .then(r => r.json())
+    .then(data => {
+      const icon = document.getElementById("bookmark-icon");
+      icon.textContent = data.bookmarked ? "🔖" : "🏷️";
+      showToast(data.bookmarked ? "북마크 추가" : "북마크 제거", "");
+    })
+    .catch(() => showAlertModal("요청 실패"));
+}
+
+function reportPost() {
+  if (!currentUser) { showAlertModal("로그인이 필요합니다"); return; }
+  showPromptModal("신고 사유를 입력하세요", "").then(reason => {
+    if (!reason) return;
+    authFetch("/api/reports", {
+      method: "POST",
+      body: JSON.stringify({ target_type: "post", target_id: currentPostId, reason })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) return showAlertModal(data.error);
+        showToast("신고가 접수되었습니다.", "success");
+      })
+      .catch(() => showAlertModal("신고 실패"));
+  });
+}
+
 function submitPost() {
   const category_id = document.getElementById("write-category").value;
   const title = document.getElementById("write-title").value.trim();
@@ -929,6 +1041,10 @@ function submitPost() {
     return;
   }
 
+  const tagsInput = document.getElementById("write-tags");
+  const tags = tagsInput ? tagsInput.value.split(",").map(s => s.trim()).filter(Boolean) : [];
+  localStorage.removeItem("draft_title");
+  localStorage.removeItem("draft_content");
   authFetch("/api/posts", {
     method: "POST",
     body: JSON.stringify({
@@ -942,6 +1058,9 @@ function submitPost() {
       return r.json();
     })
     .then((data) => {
+      if (tags.length) {
+        authFetch(`/api/posts/${data.id}/tags`, { method: "POST", body: JSON.stringify({ tags }) }).catch(() => {});
+      }
       showToast("게시글이 작성되었습니다.", "success");
       showDetail(data.id);
     })
@@ -962,6 +1081,8 @@ function updatePost() {
     return;
   }
 
+  const tagsInput = document.getElementById("edit-tags");
+  const tags = tagsInput ? tagsInput.value.split(",").map(s => s.trim()).filter(Boolean) : [];
   authFetch(`/api/posts/${currentPostId}`, {
     method: "PUT",
     body: JSON.stringify({
@@ -975,6 +1096,7 @@ function updatePost() {
       return r.json();
     })
     .then(() => {
+      authFetch(`/api/posts/${currentPostId}/tags`, { method: "POST", body: JSON.stringify({ tags }) }).catch(() => {});
       showToast("게시글이 수정되었습니다.", "success");
       showDetail(currentPostId);
     })
@@ -1025,9 +1147,11 @@ function submitComment() {
     return;
   }
 
+  const body = { content };
+  if (currentReplyTo) body.parent_id = currentReplyTo;
   authFetch(`/api/posts/${currentPostId}/comments`, {
     method: "POST",
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(body),
   })
     .then((r) => {
       if (!r.ok) return r.json().then((e) => Promise.reject(e.error));
@@ -1035,6 +1159,9 @@ function submitComment() {
     })
     .then(() => {
       document.getElementById("comment-content").value = "";
+      currentReplyTo = null;
+      const notice = document.querySelector(".reply-notice");
+      if (notice) notice.remove();
       showToast("댓글이 작성되었습니다.", "success");
       loadPost(currentPostId);
       setTimeout(() => {
@@ -1123,15 +1250,15 @@ function loadProfile(username) {
   authFetch(`/api/users/${encodeURIComponent(username)}`)
     .then((r) => r.json())
     .then((user) => {
-      const actionBtns =
-        !isMyPage && currentUser
-          ? `<button class="btn-follow ${user.is_following ? "following" : ""}" onclick="toggleFollow('${escHtml(user.username)}')">${user.is_following ? "팔로잉" : "팔로우"}</button>
-         <button class="btn-chat-action" onclick="startChat('${escHtml(user.username)}')">💬 메시지</button>`
-          : "";
+      const actionBtns = !isMyPage && currentUser ? `
+        <button class="btn-follow ${user.is_following ? "following" : ""}" onclick="toggleFollow('${escHtml(user.username)}')">${user.is_following ? "팔로잉" : "팔로우"}</button>
+        <button class="btn-chat-action" onclick="startChat('${escHtml(user.username)}')">💬 메시지</button>
+        <button class="btn-chat-action" onclick="toggleBlock('${escHtml(user.username)}')" style="color:var(--red)">${user.is_blocked ? "✓ 차단 해제" : "🚫 차단"}</button>
+      ` : "";
 
       header.innerHTML = `
       <div class="profile-card">
-        <div class="profile-avatar">${escHtml(user.username.charAt(0).toUpperCase())}</div>
+        <div class="profile-avatar">${avatarHtml(user.avatar, user.username, 64)}</div>
         <div class="profile-info">
           <div class="profile-name">
             ${escHtml(user.username)}
@@ -1145,7 +1272,7 @@ function loadProfile(username) {
             <span>팔로잉 ${user.following_count}</span>
           </div>
         </div>
-        ${user.is_following || (!isMyPage && currentUser) ? `<div class="profile-actions">${actionBtns}</div>` : ""}
+        <div class="profile-actions">${actionBtns}</div>
       </div>
     `;
 
@@ -1342,6 +1469,7 @@ function loadSettingsInfo(username) {
     .then((r) => r.json())
     .then((user) => {
       document.getElementById("settings-userinfo").innerHTML = `
+      <div class="settings-info-row"><span class="settings-info-label">프로필 사진</span><span class="settings-info-value">${avatarHtml(user.avatar, user.username, 48)} <button class="btn-text small" onclick="uploadAvatar()">변경</button></span></div>
       <div class="settings-info-row"><span class="settings-info-label">닉네임</span><span class="settings-info-value">${escHtml(user.username)} ${user.is_admin ? '<span class="admin-badge">관리자</span>' : ""}</span></div>
       <div class="settings-info-row"><span class="settings-info-label">이메일</span><span class="settings-info-value">${escHtml(user.email || "등록되지 않음")}</span></div>
       <div class="settings-info-row"><span class="settings-info-label">가입일</span><span class="settings-info-value">${formatDate(user.created_at)}</span></div>
@@ -1350,6 +1478,41 @@ function loadSettingsInfo(username) {
     `;
     })
     .catch(() => {});
+}
+
+function uploadAvatar() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("avatar", file);
+    authFetch("/api/upload/avatar", { method: "POST", body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) return showAlertModal(data.error);
+        currentUser.avatar = data.avatar;
+        updateHeader();
+        loadProfile(currentUser.username);
+        loadSettingsInfo(currentUser.username);
+        showToast("프로필 사진이 변경되었습니다.", "success");
+      })
+      .catch(() => showAlertModal("업로드 실패"));
+  };
+  input.click();
+}
+
+function toggleBlock(username) {
+  if (!currentUser) { showAuthModal("login"); return; }
+  authFetch(`/api/users/${encodeURIComponent(username)}/block`, { method: "POST" })
+    .then(r => r.json())
+    .then(data => {
+      showToast(data.blocked ? "차단했습니다." : "차단 해제했습니다.", "");
+      loadProfile(currentProfileUsername);
+    })
+    .catch((err) => showAlertModal(typeof err === "string" ? err : "요청 실패"));
 }
 
 async function deleteAccount() {
@@ -1465,9 +1628,9 @@ function loadChatRooms() {
         .map(
           (r) => `
       <div class="chat-room-item" onclick="showChatRoom(${r.room_id}, '${escHtml(r.other_username)}')">
-        <div class="chat-room-avatar">${escHtml((r.other_username || "?").charAt(0).toUpperCase())}</div>
+        <div class="chat-room-avatar">${avatarHtml(r.other_avatar, r.other_username, 40)}</div>
         <div class="chat-room-info">
-          <div class="chat-room-name">${escHtml(r.other_username || "알 수 없음")}</div>
+          <div class="chat-room-name">${avatarHtml(r.other_avatar, r.other_username, 20)}${escHtml(r.other_username || "알 수 없음")}</div>
           <div class="chat-room-preview">${escHtml(r.last_message || "메시지가 없습니다")}</div>
         </div>
         <div class="chat-room-meta">
@@ -1621,6 +1784,45 @@ function loadNotifications() {
     });
 }
 
+function showBookmarks() {
+  if (!currentUser) { showAuthModal("login"); return; }
+  hideAllViews();
+  document.getElementById("view-bookmarks").classList.remove("hidden");
+  loadBookmarks();
+  updateHash();
+}
+
+function loadBookmarks(page) {
+  const container = document.getElementById("bookmarks-container");
+  const p = page || 1;
+  container.innerHTML = '<div class="loading">불러오는 중...</div>';
+  authFetch(`/api/bookmarks?page=${p}&limit=10`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.bookmarks.length === 0) {
+        container.innerHTML = '<div class="empty">북마크한 게시글이 없습니다.</div>';
+        return;
+      }
+      container.innerHTML = data.bookmarks.map(b => `
+        <div class="post-item" onclick="showDetail(${b.id})">
+          <div>
+            <div class="post-item-title">${escHtml(b.title)}</div>
+            <div class="post-item-meta">${escHtml(b.username)} · 북마크 ${formatDate(b.bookmarked_at)}</div>
+          </div>
+        </div>
+      `).join("");
+      const pDiv = document.getElementById("bookmarks-pagination");
+      if (data.totalPages > 1) {
+        let h = "";
+        for (let i = 1; i <= data.totalPages; i++) {
+          h += `<button class="page-btn${i === p ? " active" : ""}" onclick="loadBookmarks(${i})">${i}</button>`;
+        }
+        pDiv.innerHTML = h;
+      } else { pDiv.innerHTML = ""; }
+    })
+    .catch(() => { container.innerHTML = '<div class="empty error-msg">불러오지 못했습니다.</div>'; });
+}
+
 function clickNotif(index) {
   const n = notifList[index];
   if (!n) return;
@@ -1716,6 +1918,8 @@ function updateHash() {
       (title ? "/" + encodeURIComponent(title) : "");
   } else if (id === "view-notifications") {
     hash = "#notifications";
+  } else if (id === "view-bookmarks") {
+    hash = "#bookmarks";
   }
   if (hash && location.hash !== hash) {
     updatingHash = true;
@@ -1764,6 +1968,10 @@ function loadFromHash() {
   }
   if (hash === "#notifications") {
     showNotifications();
+    return;
+  }
+  if (hash === "#bookmarks") {
+    showBookmarks();
     return;
   }
   if (hash.startsWith("#chat-room/")) {

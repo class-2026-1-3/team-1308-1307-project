@@ -119,10 +119,18 @@ function runMigration() {
     "CREATE TABLE IF NOT EXISTS chat_room_members (id INT AUTO_INCREMENT PRIMARY KEY, room_id INT NOT NULL, user_id INT NOT NULL, UNIQUE KEY unique_member (room_id, user_id), FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS chat_messages (id INT AUTO_INCREMENT PRIMARY KEY, room_id INT NOT NULL, user_id INT NOT NULL, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, type VARCHAR(20) NOT NULL, message TEXT NOT NULL, related_user_id INT DEFAULT NULL, related_post_id INT DEFAULT NULL, related_comment_id INT DEFAULT NULL, related_room_id INT DEFAULT NULL, is_read TINYINT(1) DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, INDEX idx_notifications_user (user_id, is_read))",
+    "CREATE TABLE IF NOT EXISTS tags (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(30) NOT NULL UNIQUE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS post_tags (id INT AUTO_INCREMENT PRIMARY KEY, post_id INT NOT NULL, tag_id INT NOT NULL, UNIQUE KEY unique_post_tag (post_id, tag_id), FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE, FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS bookmarks (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, post_id INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY unique_bookmark (user_id, post_id), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS reports (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, target_type VARCHAR(10) NOT NULL, target_id INT NOT NULL, reason TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+    "CREATE TABLE IF NOT EXISTS blocks (id INT AUTO_INCREMENT PRIMARY KEY, blocker_id INT NOT NULL, blocked_id INT NOT NULL, UNIQUE KEY unique_block (blocker_id, blocked_id), FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE)",
     { table: "posts", col: "category_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL" },
     { table: "posts", col: "views", def: "INT DEFAULT 0" },
     { table: "posts", col: "is_pinned", def: "TINYINT(1) DEFAULT 0" },
     { table: "users", col: "email", def: "VARCHAR(100) DEFAULT NULL" },
+    { table: "users", col: "avatar", def: "VARCHAR(255) DEFAULT NULL" },
+    { table: "comments", col: "parent_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE" },
+    { table: "bookmarks", col: "created_at", def: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP" },
   ];
   const alterUnique = [
     { table: "users", col: "email", constraint: "UNIQUE KEY unique_email (email)" },
@@ -354,9 +362,9 @@ app.post("/api/auth/login", (req, res) => {
 
 app.get("/api/auth/me", authenticate, (req, res) => {
   if (!req.user) return res.json({ user: null });
-  db.query("SELECT id, username, email, created_at FROM users WHERE id = ?", [req.user.id], (err, users) => {
-    if (err || users.length === 0) return res.json({ user: { id: req.user.id, username: req.user.username, email: null, isAdmin: req.user.isAdmin } });
-    res.json({ user: { id: users[0].id, username: users[0].username, email: users[0].email, isAdmin: req.user.isAdmin } });
+  db.query("SELECT id, username, email, avatar, created_at FROM users WHERE id = ?", [req.user.id], (err, users) => {
+    if (err || users.length === 0) return res.json({ user: { id: req.user.id, username: req.user.username, email: null, avatar: null, isAdmin: req.user.isAdmin } });
+    res.json({ user: { id: users[0].id, username: users[0].username, email: users[0].email, avatar: users[0].avatar, isAdmin: req.user.isAdmin } });
   });
 });
 
@@ -379,8 +387,8 @@ app.get("/api/posts", (req, res) => {
   const params = [];
 
   if (search) {
-    where.push("p.title LIKE ?");
-    params.push(`%${search}%`);
+    where.push("(p.title LIKE ? OR p.content LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`);
   }
   if (category) {
     where.push("c.slug = ?");
@@ -403,12 +411,13 @@ app.get("/api/posts", (req, res) => {
   `;
   const dataSql = `
     SELECT p.id, p.title, p.created_at, p.views, p.is_pinned,
-      u.username,
+      u.username, u.avatar,
       c.name AS category_name, c.slug AS category_slug,
       (SELECT COUNT(*) FROM comments co WHERE co.post_id = p.id) AS comment_count,
       (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
       CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS is_member,
-      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password
+      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
+      (SELECT GROUP_CONCAT(t.name) FROM post_tags pt JOIN tags t ON pt.tag_id = t.id WHERE pt.post_id = p.id) AS tags
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     LEFT JOIN categories c ON p.category_id = c.id
@@ -438,18 +447,20 @@ app.get("/api/posts/:id", authenticate, (req, res) => {
 
   const postSql = `
     SELECT p.id, p.title, p.content, p.created_at, p.views, p.is_pinned, p.user_id,
-      u.username,
+      u.username, u.avatar,
       c.name AS category_name, c.slug AS category_slug,
       (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
       CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS is_member,
-      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password
+      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
+      (SELECT GROUP_CONCAT(t.name) FROM post_tags pt JOIN tags t ON pt.tag_id = t.id WHERE pt.post_id = p.id) AS tags,
+      (SELECT COUNT(*) FROM bookmarks WHERE post_id = p.id) AS bookmark_count
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     LEFT JOIN categories c ON p.category_id = c.id
     WHERE p.id = ?
   `;
   const commentSql = `
-    SELECT co.id, co.content, co.created_at, co.user_id, u.username,
+    SELECT co.id, co.content, co.created_at, co.user_id, co.parent_id, u.username, u.avatar,
       CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS is_member,
       CASE WHEN co.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password
     FROM comments co LEFT JOIN users u ON co.user_id = u.id
@@ -465,18 +476,19 @@ app.get("/api/posts/:id", authenticate, (req, res) => {
     db.query(commentSql, [req.params.id], (err, comments) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      let hasLiked = false;
+      let hasLiked = false, hasBookmarked = false;
       if (req.user) {
-        db.query(
-          "SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?",
-          [req.params.id, req.user.id],
-          (err, likes) => {
+        (function check() {
+          db.query("SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?", [req.params.id, req.user.id], (err, likes) => {
             if (!err) hasLiked = likes.length > 0;
-            res.json({ ...posts[0], comments, hasLiked });
-          }
-        );
+            db.query("SELECT id FROM bookmarks WHERE post_id = ? AND user_id = ?", [req.params.id, req.user.id], (err, bm) => {
+              if (!err) hasBookmarked = bm.length > 0;
+              res.json({ ...posts[0], comments, hasLiked, hasBookmarked });
+            });
+          });
+        })();
       } else {
-        res.json({ ...posts[0], comments, hasLiked: false });
+        res.json({ ...posts[0], comments, hasLiked: false, hasBookmarked: false });
       }
     });
   });
@@ -616,12 +628,13 @@ app.get("/api/users/:username/posts", (req, res) => {
   `;
   const dataSql = `
     SELECT p.id, p.title, p.created_at, p.views, p.is_pinned,
-      u.username,
+      u.username, u.avatar,
       c.name AS category_name, c.slug AS category_slug,
       (SELECT COUNT(*) FROM comments co WHERE co.post_id = p.id) AS comment_count,
       (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id) AS like_count,
       CASE WHEN u.password_hash IS NOT NULL THEN 1 ELSE 0 END AS is_member,
-      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password
+      CASE WHEN p.password_hash IS NOT NULL THEN 1 ELSE 0 END AS has_password,
+      (SELECT GROUP_CONCAT(t.name) FROM post_tags pt JOIN tags t ON pt.tag_id = t.id WHERE pt.post_id = p.id) AS tags
     FROM posts p
     LEFT JOIN users u ON p.user_id = u.id
     LEFT JOIN categories c ON p.category_id = c.id
@@ -642,7 +655,7 @@ app.get("/api/users/:username/posts", (req, res) => {
 
 app.get("/api/users/:username", authenticate, (req, res) => {
   db.query(
-    "SELECT id, username, email, created_at FROM users WHERE username = ?",
+    "SELECT id, username, email, avatar, created_at FROM users WHERE username = ?",
     [req.params.username],
     (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -666,21 +679,30 @@ app.get("/api/users/:username", authenticate, (req, res) => {
                     [targetId], (err, followingResult) => {
                       if (err) return res.status(500).json({ error: err.message });
                       let is_following = false;
+                      let is_blocked = false;
                       if (req.user) {
                         db.query(
                           "SELECT id FROM follows WHERE follower_id = ? AND following_id = ?",
                           [req.user.id, targetId],
                           (err, follows) => {
                             if (!err) is_following = follows.length > 0;
-                            res.json({
-                              ...users[0],
-                              post_count: postResult[0].post_count,
-                              comment_count: commentResult[0].comment_count,
-                              follower_count: followerResult[0].follower_count,
-                              following_count: followingResult[0].following_count,
-                              is_admin: isAdminUser(users[0].username),
-                              is_following,
-                            });
+                            db.query(
+                              "SELECT id FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+                              [req.user.id, targetId],
+                              (err, blocks) => {
+                                if (!err) is_blocked = blocks.length > 0;
+                                res.json({
+                                  ...users[0],
+                                  post_count: postResult[0].post_count,
+                                  comment_count: commentResult[0].comment_count,
+                                  follower_count: followerResult[0].follower_count,
+                                  following_count: followingResult[0].following_count,
+                                  is_admin: isAdminUser(users[0].username),
+                                  is_following,
+                                  is_blocked,
+                                });
+                              }
+                            );
                           }
                         );
                       } else {
@@ -692,6 +714,7 @@ app.get("/api/users/:username", authenticate, (req, res) => {
                           following_count: followingResult[0].following_count,
                           is_admin: isAdminUser(users[0].username),
                           is_following: false,
+                          is_blocked: false,
                         });
                       }
                     });
@@ -781,14 +804,15 @@ app.put("/api/auth/password", authenticate, requireAuth, (req, res) => {
 });
 
 app.post("/api/posts/:id/comments", authenticate, requireAuth, (req, res) => {
-  const { content } = req.body;
+  const { content, parent_id } = req.body;
   const cleanContent = sanitize(content || "");
   if (!cleanContent)
     return res.status(400).json({ error: "댓글 내용을 입력하세요" });
 
+  const pid = parent_id ? parseInt(parent_id) : null;
   db.query(
-    "INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)",
-    [req.params.id, req.user.id, cleanContent],
+    "INSERT INTO comments (post_id, user_id, parent_id, content) VALUES (?, ?, ?, ?)",
+    [req.params.id, req.user.id, pid, cleanContent],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       const commentId = result.insertId;
@@ -902,11 +926,12 @@ app.get("/api/chat/rooms", authenticate, requireAuth, (req, res) => {
        (SELECT content FROM chat_messages WHERE room_id = r.id ORDER BY created_at DESC LIMIT 1) AS last_message,
        (SELECT created_at FROM chat_messages WHERE room_id = r.id ORDER BY created_at DESC LIMIT 1) AS last_message_at,
        (SELECT COUNT(*) FROM chat_messages WHERE room_id = r.id) AS message_count,
-       (SELECT u.username FROM chat_room_members m JOIN users u ON m.user_id = u.id WHERE m.room_id = r.id AND m.user_id != ?) AS other_username
+       (SELECT u.username FROM chat_room_members m JOIN users u ON m.user_id = u.id WHERE m.room_id = r.id AND m.user_id != ?) AS other_username,
+       (SELECT u.avatar FROM chat_room_members m JOIN users u ON m.user_id = u.id WHERE m.room_id = r.id AND m.user_id != ?) AS other_avatar
      FROM chat_rooms r
      INNER JOIN chat_room_members m ON r.id = m.room_id AND m.user_id = ?
      ORDER BY last_message_at DESC`,
-    [req.user.id, req.user.id],
+    [req.user.id, req.user.id, req.user.id],
     (err, rooms) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(rooms);
@@ -1035,6 +1060,139 @@ app.post("/api/notifications/read-all", authenticate, requireAuth, (req, res) =>
   db.query("UPDATE notifications SET is_read = 1 WHERE user_id = ?", [req.user.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
+  });
+});
+
+// ── Avatar Upload ──
+app.post("/api/upload/avatar", authenticate, requireAuth, (req, res) => {
+  upload.single("avatar")(req, res, (err) => {
+    if (err) return res.status(400).json({ error: "업로드 오류: " + err.message });
+    if (!req.file) return res.status(400).json({ error: "파일을 선택하세요" });
+    const url = "/uploads/" + req.file.filename;
+    db.query("UPDATE users SET avatar = ? WHERE id = ?", [url, req.user.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ avatar: url });
+    });
+  });
+});
+
+// ── Tags ──
+app.get("/api/tags", (req, res) => {
+  db.query("SELECT id, name FROM tags ORDER BY name ASC", (err, tags) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(tags);
+  });
+});
+
+app.post("/api/posts/:id/tags", authenticate, requireAuth, (req, res) => {
+  const { tags } = req.body;
+  db.query("SELECT user_id FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (posts.length === 0) return res.status(404).json({ error: "게시글을 찾을 수 없습니다" });
+    if (!canModifyPost(posts[0], req.user)) return res.status(403).json({ error: "권한이 없습니다" });
+    db.query("DELETE FROM post_tags WHERE post_id = ?", [req.params.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const names = (tags || []).map(s => sanitize(s)).filter(s => s.length > 0 && s.length <= 30);
+      if (names.length === 0) return res.json({ tags: [] });
+      const placeholders = names.map(() => "(?)").join(",");
+      db.query(`INSERT IGNORE INTO tags (name) VALUES ${placeholders}`, names, (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        db.query("SELECT id, name FROM tags WHERE name IN (?)", [names], (err, tagRows) => {
+          if (err) return res.status(500).json({ error: err.message });
+          const vals = tagRows.map(t => [req.params.id, t.id]);
+          db.query("INSERT IGNORE INTO post_tags (post_id, tag_id) VALUES ?", [vals], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ tags: tagRows.map(t => t.name) });
+          });
+        });
+      });
+    });
+  });
+});
+
+// ── Bookmarks ──
+app.post("/api/bookmarks/:postId", authenticate, requireAuth, (req, res) => {
+  db.query("SELECT id FROM bookmarks WHERE user_id = ? AND post_id = ?", [req.user.id, req.params.postId], (err, bm) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (bm.length > 0) {
+      db.query("DELETE FROM bookmarks WHERE user_id = ? AND post_id = ?", [req.user.id, req.params.postId], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ bookmarked: false });
+      });
+    } else {
+      db.query("INSERT INTO bookmarks (user_id, post_id) VALUES (?, ?)", [req.user.id, req.params.postId], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ bookmarked: true });
+      });
+    }
+  });
+});
+
+app.get("/api/bookmarks", authenticate, requireAuth, (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+  const offset = (page - 1) * limit;
+  db.query(
+    `SELECT COUNT(*) AS total FROM bookmarks WHERE user_id = ?`, [req.user.id], (err, cnt) => {
+      if (err) return res.status(500).json({ error: err.message });
+      const total = cnt[0].total;
+      db.query(
+        `SELECT b.created_at AS bookmarked_at, p.id, p.title, p.created_at, u.username
+         FROM bookmarks b JOIN posts p ON b.post_id = p.id LEFT JOIN users u ON p.user_id = u.id
+         WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT ? OFFSET ?`,
+        [req.user.id, limit, offset], (err, rows) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ bookmarks: rows, total, page, totalPages: Math.ceil(total / limit) || 1 });
+        }
+      );
+    }
+  );
+});
+
+// ── Reports ──
+app.post("/api/reports", authenticate, requireAuth, (req, res) => {
+  const { target_type, target_id, reason } = req.body;
+  if (!target_type || !target_id || !reason) return res.status(400).json({ error: "신고 정보를 입력하세요" });
+  if (!["post", "comment"].includes(target_type)) return res.status(400).json({ error: "유효하지 않은 신고 대상입니다" });
+  db.query(
+    "INSERT INTO reports (user_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)",
+    [req.user.id, target_type, target_id, reason.trim()], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      // notify admin
+      db.query("SELECT id FROM users WHERE username = ?", [ADMIN_USERNAME], (err, admins) => {
+        if (!err && admins.length > 0 && io) {
+          db.query("INSERT INTO notifications (user_id, type, message, related_user_id) VALUES (?, 'report', ?, ?)",
+            [admins[0].id, `${req.user.username}님이 ${target_type}을(를) 신고했습니다.`, req.user.id], (err2) => {
+              if (!err2) io.to(`user:${admins[0].id}`).emit("new-notification", { type: "report" });
+            });
+        }
+      });
+      res.json({ message: "신고가 접수되었습니다." });
+    }
+  );
+});
+
+// ── Block ──
+app.post("/api/users/:username/block", authenticate, requireAuth, (req, res) => {
+  if (req.user.username === req.params.username) return res.status(400).json({ error: "자신을 차단할 수 없습니다" });
+  db.query("SELECT id FROM users WHERE username = ?", [req.params.username], (err, users) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (users.length === 0) return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+    const targetId = users[0].id;
+    db.query("SELECT id FROM blocks WHERE blocker_id = ? AND blocked_id = ?", [req.user.id, targetId], (err, blocks) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (blocks.length > 0) {
+        db.query("DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?", [req.user.id, targetId], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ blocked: false });
+        });
+      } else {
+        db.query("INSERT INTO blocks (blocker_id, blocked_id) VALUES (?, ?)", [req.user.id, targetId], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ blocked: true });
+        });
+      }
+    });
   });
 });
 

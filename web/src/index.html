@@ -25,6 +25,7 @@
         </div>
         <div class="header-actions">
           <div id="header-user" class="header-user hidden">
+            <button id="btn-dark" class="btn-icon" onclick="toggleDark()" title="다크모드">🌙</button>
             <button
               id="btn-notif"
               class="btn-notif hidden"
@@ -33,8 +34,7 @@
               <span id="notif-bell">🔔</span>
               <span id="notif-badge" class="notif-badge hidden">0</span>
             </button>
-            <button class="btn-user" onclick="showMyPage()">
-              <span class="user-icon">👤</span>
+            <button class="btn-user" onclick="showMyPage()" style="display:flex;align-items:center;">
               <span id="header-username"></span>
             </button>
             <span class="header-divider"></span>
@@ -51,6 +51,13 @@
             onclick="showChatList()"
           >
             💬 채팅
+          </button>
+          <button
+            id="btn-bookmark-header"
+            class="btn-chat hidden"
+            onclick="showBookmarks()"
+          >
+            🔖 북마크
           </button>
           <button class="btn-write" onclick="showWrite()">+ 글쓰기</button>
         </div>
@@ -299,6 +306,10 @@
               placeholder="내용을 입력하세요 (Markdown 지원)"
             ></textarea>
           </div>
+          <div class="form-group">
+            <label>태그 (쉼표로 구분)</label>
+            <input type="text" id="write-tags" placeholder="예: 개발, 일상, 팁" />
+          </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showList()">취소</button>
             <button class="btn-submit" onclick="submitPost()">게시하기</button>
@@ -386,6 +397,10 @@
               placeholder="내용을 입력하세요 (Markdown 지원)"
             ></textarea>
           </div>
+          <div class="form-group">
+            <label>태그 (쉼표로 구분)</label>
+            <input type="text" id="edit-tags" placeholder="예: 개발, 일상, 팁" />
+          </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showDetail(currentPostId)">
               취소
@@ -415,6 +430,12 @@
           <button id="btn-like" class="btn-like" onclick="toggleLike()">
             <span id="like-icon">♡</span>
             <span id="like-count">0</span>
+          </button>
+          <button id="btn-bookmark" class="btn-like" onclick="toggleBookmark()" title="북마크">
+            <span id="bookmark-icon">🏷️</span>
+          </button>
+          <button class="btn-like" onclick="reportPost()" title="신고" style="margin-left:auto;color:var(--text2);font-size:13px;">
+            🚨 신고
           </button>
         </div>
         <div class="comment-section">
@@ -583,6 +604,19 @@
             전송
           </button>
         </div>
+      </div>
+    </main>
+
+    <main id="view-bookmarks" class="hidden">
+      <div class="container narrow">
+        <div class="page-title">
+          <h2>🔖 북마크</h2>
+          <button class="btn-back" onclick="goBack()">← 돌아가기</button>
+        </div>
+        <div id="bookmarks-container">
+          <div class="loading">불러오는 중...</div>
+        </div>
+        <div id="bookmarks-pagination" class="pagination"></div>
       </div>
     </main>
 
