@@ -14,7 +14,7 @@ const multer = require("multer");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: "*", methods: ["GET", "POST"] },
 });
 const port = 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "teamP-community-secret-key-2026";
@@ -24,31 +24,67 @@ const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
 
 app.use(cors());
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: false,
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "https:"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "cdn.jsdelivr.net"],
-      styleSrcElem: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "cdn.jsdelivr.net"],
-      styleSrcAttr: ["'unsafe-inline'"],
-      fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
-      imgSrc: ["'self'", "data:", "https:", "blob:"],
-      connectSrc: ["'self'", CLIENT_URL, "http://localhost:3000", "http://127.0.0.1:3000", "https:", "wss:"],
-      formAction: ["'self'"],
-      frameAncestors: ["'self'"],
-      baseUri: ["'self'"],
-      objectSrc: ["'none'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "cdn.jsdelivr.net",
+          "cdnjs.cloudflare.com",
+          "https:",
+        ],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "fonts.googleapis.com",
+          "cdn.jsdelivr.net",
+        ],
+        styleSrcElem: [
+          "'self'",
+          "'unsafe-inline'",
+          "fonts.googleapis.com",
+          "cdn.jsdelivr.net",
+        ],
+        styleSrcAttr: ["'unsafe-inline'"],
+        fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        connectSrc: [
+          "'self'",
+          CLIENT_URL,
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
+          "https:",
+          "wss:",
+        ],
+        formAction: ["'self'"],
+        frameAncestors: ["'self'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"],
+      },
     },
-  },
-}));
+  }),
+);
 app.use(express.json({ limit: "1mb" }));
 
-const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: { error: "너무 많은 요청입니다. 잠시 후 다시 시도하세요." } });
-const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 200, message: { error: "너무 많은 요청입니다." } });
-const uploadLimiter = rateLimit({ windowMs: 60 * 1000, max: 10, message: { error: "업로드는 1분에 10번만 가능합니다." } });
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: "너무 많은 요청입니다. 잠시 후 다시 시도하세요." },
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  message: { error: "너무 많은 요청입니다." },
+});
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: "업로드는 1분에 10번만 가능합니다." },
+});
 app.use("/api/auth", authLimiter);
 app.use("/api/upload", uploadLimiter);
 app.use("/api", apiLimiter);
@@ -63,7 +99,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, Date.now() + "-" + Math.random().toString(36).slice(2) + ext);
-  }
+  },
 });
 
 const upload = multer({
@@ -73,12 +109,13 @@ const upload = multer({
     const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
     const ext = path.extname(file.originalname).toLowerCase();
     cb(null, allowed.includes(ext));
-  }
+  },
 });
 
 app.post("/api/upload", authenticate, requireAuth, (req, res) => {
   upload.single("image")(req, res, (err) => {
-    if (err) return res.status(400).json({ error: "업로드 오류: " + err.message });
+    if (err)
+      return res.status(400).json({ error: "업로드 오류: " + err.message });
     if (!req.file) return res.status(400).json({ error: "파일을 선택하세요" });
     res.json({ url: "/uploads/" + req.file.filename });
   });
@@ -124,19 +161,40 @@ function runMigration() {
     "CREATE TABLE IF NOT EXISTS bookmarks (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, post_id INT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY unique_bookmark (user_id, post_id), FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS reports (id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, target_type VARCHAR(10) NOT NULL, target_id INT NOT NULL, reason TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
     "CREATE TABLE IF NOT EXISTS blocks (id INT AUTO_INCREMENT PRIMARY KEY, blocker_id INT NOT NULL, blocked_id INT NOT NULL, UNIQUE KEY unique_block (blocker_id, blocked_id), FOREIGN KEY (blocker_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE)",
-    { table: "posts", col: "category_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL" },
+    {
+      table: "posts",
+      col: "category_id",
+      def: "INT DEFAULT NULL",
+      fk: "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL",
+    },
     { table: "posts", col: "views", def: "INT DEFAULT 0" },
     { table: "posts", col: "is_pinned", def: "TINYINT(1) DEFAULT 0" },
     { table: "users", col: "email", def: "VARCHAR(100) DEFAULT NULL" },
     { table: "users", col: "avatar", def: "VARCHAR(255) DEFAULT NULL" },
-    { table: "comments", col: "parent_id", def: "INT DEFAULT NULL", fk: "FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE" },
-    { table: "bookmarks", col: "created_at", def: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP" },
+    {
+      table: "comments",
+      col: "parent_id",
+      def: "INT DEFAULT NULL",
+      fk: "FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE",
+    },
+    {
+      table: "bookmarks",
+      col: "created_at",
+      def: "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+    },
   ];
   const alterUnique = [
-    { table: "users", col: "email", constraint: "UNIQUE KEY unique_email (email)" },
+    {
+      table: "users",
+      col: "email",
+      constraint: "UNIQUE KEY unique_email (email)",
+    },
   ];
   function run(i) {
-    if (i >= migrations.length) { runAlterUnique(0); return; }
+    if (i >= migrations.length) {
+      runAlterUnique(0);
+      return;
+    }
     const m = migrations[i];
     if (typeof m === "string") {
       db.query(m, (err) => {
@@ -148,19 +206,26 @@ function runMigration() {
         `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
         [dbName, m.table, m.col],
         (err, result) => {
-          if (err) { console.error(`확인 실패 (${m.table}.${m.col}):`, err.message); return run(i + 1); }
+          if (err) {
+            console.error(`확인 실패 (${m.table}.${m.col}):`, err.message);
+            return run(i + 1);
+          }
           if (result[0].cnt === 0) {
             let sql = `ALTER TABLE ${m.table} ADD COLUMN ${m.col} ${m.def}`;
             if (m.fk) sql += `, ADD ${m.fk}`;
             db.query(sql, (err) => {
-              if (err) console.error(`마이그레이션 실패 (${m.table}.${m.col}):`, err.message);
+              if (err)
+                console.error(
+                  `마이그레이션 실패 (${m.table}.${m.col}):`,
+                  err.message,
+                );
               else console.log(`마이그레이션 완료: ${m.table}.${m.col}`);
               run(i + 1);
             });
           } else {
             run(i + 1);
           }
-        }
+        },
       );
     }
   }
@@ -171,17 +236,27 @@ function runMigration() {
       `SELECT COUNT(*) AS cnt FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'UNIQUE'`,
       [dbName, m.table, `unique_${m.col}`],
       (err, result) => {
-        if (err) { console.error(`제약 조건 확인 실패 (${m.table}.${m.col}):`, err.message); return runAlterUnique(i + 1); }
+        if (err) {
+          console.error(
+            `제약 조건 확인 실패 (${m.table}.${m.col}):`,
+            err.message,
+          );
+          return runAlterUnique(i + 1);
+        }
         if (result[0].cnt === 0) {
           db.query(`ALTER TABLE ${m.table} ADD ${m.constraint}`, (err) => {
-            if (err) console.error(`고유 제약 추가 실패 (${m.table}.${m.col}):`, err.message);
+            if (err)
+              console.error(
+                `고유 제약 추가 실패 (${m.table}.${m.col}):`,
+                err.message,
+              );
             else console.log(`고유 제약 추가 완료: ${m.table}.${m.col}`);
             runAlterUnique(i + 1);
           });
         } else {
           runAlterUnique(i + 1);
         }
-      }
+      },
     );
   }
   run(0);
@@ -193,15 +268,24 @@ function sanitize(str) {
 }
 
 function seedAdmin() {
-  db.query("SELECT id FROM users WHERE username = ?", [ADMIN_USERNAME], (err, users) => {
-    if (err || users.length > 0) return;
-    bcrypt.hash(ADMIN_PASSWORD, 10, (err, hash) => {
-      if (err) return;
-      db.query("INSERT INTO users (username, password_hash) VALUES (?, ?)", [ADMIN_USERNAME, hash], (err) => {
-        if (!err) console.log(`admin 계정 생성 완료 (username: ${ADMIN_USERNAME})`);
+  db.query(
+    "SELECT id FROM users WHERE username = ?",
+    [ADMIN_USERNAME],
+    (err, users) => {
+      if (err || users.length > 0) return;
+      bcrypt.hash(ADMIN_PASSWORD, 10, (err, hash) => {
+        if (err) return;
+        db.query(
+          "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+          [ADMIN_USERNAME, hash],
+          (err) => {
+            if (!err)
+              console.log(`admin 계정 생성 완료 (username: ${ADMIN_USERNAME})`);
+          },
+        );
       });
-    });
-  });
+    },
+  );
 }
 
 function seedCategories() {
@@ -212,34 +296,68 @@ function seedCategories() {
     [4, "잡담", "chat"],
   ];
   cats.forEach(([id, name, slug]) => {
-    db.query("INSERT IGNORE INTO categories (id, name, slug) VALUES (?, ?, ?)", [id, name, slug]);
+    db.query(
+      "INSERT IGNORE INTO categories (id, name, slug) VALUES (?, ?, ?)",
+      [id, name, slug],
+    );
   });
 }
 
 function seedNotices() {
-  db.query("SELECT id FROM users WHERE username = ?", [ADMIN_USERNAME], (err, users) => {
-    if (err || users.length === 0) return setTimeout(seedNotices, 1000);
-    const adminId = users[0].id;
-    const notices = [
-      { category_id: 1, slug: "free", title: "커뮤니티 이용 안내",
-        content: "## 환영합니다! 👋\n\n**자유 게시판**은 커뮤니티 회원이라면 누구나 자유롭게 이야기를 나눌 수 있는 공간입니다.\n\n### 📋 기본 규칙\n\n1. **존중과 예의** – 모든 회원을 존중하고 배려해주세요.\n2. **욕설/비방 금지** – 타인에 대한 모욕적 표현은 삼가주세요.\n3. **도배 금지** – 동일한 내용의 반복 게시를 자제해주세요.\n4. **홍보/광고 금지** – 무단 홍보 글은 삭제될 수 있습니다.\n\n---\n\n> 함께 만들어가는 커뮤니티입니다. 건전한 토론과 즐거운 대화 부탁드립니다 😊" },
-      { category_id: 2, slug: "question", title: "질문 게시판 이용 가이드",
-        content: "## 🙋 질문하기 전에 확인하세요!\n\n**질문 게시판**은 궁금한 점을 자유롭게 질문하고 답변을 받는 공간입니다.\n\n### 💡 좋은 질문하는 법\n\n1. **검색 먼저** – 이미 같은 질문이 있는지 검색해보세요.\n2. **구체적으로** – 상황, 시도한 방법, 에러 메시지를 상세히 적어주세요.\n3. **제목을 명확하게** – `도와주세요`보다 `Node.js MySQL 연결 오류`가 좋습니다.\n4. **해결 후 공유** – 문제를 해결했다면 답변을 남겨주세요!\n\n### ✅ 예시\n\n```\n질문: Express 서버에서 CORS 에러가 발생합니다.\n\n상황: React 앱에서 localhost:3001 Express 서버로 요청 시\n에러 메시지: Access-Control-Allow-Origin\n\n시도: cors() 미들웨어를 추가했지만 여전히 에러가 납니다.\n```" },
-      { category_id: 3, slug: "info", title: "정보 게시판 이용 안내",
-        content: "## 📢 유용한 정보를 공유해주세요!\n\n**정보 게시판**은 개발 팁, 기술 뉴스, 유틸리티 소개 등 유익한 정보를 공유하는 공간입니다.\n\n### 📝 정보 공유 가이드\n\n1. **출처 표기** – 인용이나 참고 자료는 반드시 출처를 남겨주세요.\n2. **검증된 정보** – 사실 여부가 확인된 정보를 공유해주세요.\n3. **카테고리 활용** – 관련 카테고리를 선택해주세요.\n4. **링크 삽입** – 참고 링크가 있다면 함께 첨부해주세요.\n\n> 예: `[MDN Web Docs](https://developer.mozilla.org/ko/)` → [MDN Web Docs](https://developer.mozilla.org/ko/)\n\n### 🖼 이미지 첨부\n\n마크다운 문법으로 이미지를 삽입할 수 있습니다:\n\n```markdown\n![설명](이미지_URL)\n```" },
-      { category_id: 4, slug: "chat", title: "잡담 게시판 이용 안내",
-        content: "## 🗣 자유롭게 이야기 나눠요!\n\n**잡담 게시판**은 일상, 취미, 가벼운 이야기를 자유롭게 나누는 공간입니다.\n\n### 🎯 이런 이야기 좋아요!\n\n- 일상 생활 이야기\n- 개발자 밈 & 유머 😄\n- IT 업계 잡담\n- 음악, 영화, 게임 등 취미 이야기\n- 사는 이야기\n\n### ⚠️ 주의사항\n\n- 정치/종교 등 민감한 주제는 자제해주세요.\n- 타인에게 불쾌감을 줄 수 있는 내용은 삼가주세요.\n- 과도한 친목/구인 활동은 지양해주세요.\n\n---\n\n**편하게 이야기 나누며 쉬어가는 공간입니다!** ☕" },
-    ];
-    notices.forEach(n => {
-      db.query("SELECT id FROM posts WHERE title = ? AND user_id = ?", [n.title, adminId], (err, posts) => {
-        if (err || posts.length > 0) return;
-        db.query("INSERT INTO posts (user_id, title, content, category_id, is_pinned) VALUES (?, ?, ?, ?, 1)",
-          [adminId, n.title, n.content, n.category_id], (err) => {
-            if (!err) console.log(`공지 등록 완료: ${n.title}`);
-          });
+  db.query(
+    "SELECT id FROM users WHERE username = ?",
+    [ADMIN_USERNAME],
+    (err, users) => {
+      if (err || users.length === 0) return setTimeout(seedNotices, 1000);
+      const adminId = users[0].id;
+      const notices = [
+        {
+          category_id: 1,
+          slug: "free",
+          title: "커뮤니티 이용 안내",
+          content:
+            "## 환영합니다! 👋\n\n**자유 게시판**은 커뮤니티 회원이라면 누구나 자유롭게 이야기를 나눌 수 있는 공간입니다.\n\n### 📋 기본 규칙\n\n1. **존중과 예의** – 모든 회원을 존중하고 배려해주세요.\n2. **욕설/비방 금지** – 타인에 대한 모욕적 표현은 삼가주세요.\n3. **도배 금지** – 동일한 내용의 반복 게시를 자제해주세요.\n4. **홍보/광고 금지** – 무단 홍보 글은 삭제될 수 있습니다.\n\n---\n\n> 함께 만들어가는 커뮤니티입니다. 건전한 토론과 즐거운 대화 부탁드립니다 😊",
+        },
+        {
+          category_id: 2,
+          slug: "question",
+          title: "질문 게시판 이용 가이드",
+          content:
+            "## 🙋 질문하기 전에 확인하세요!\n\n**질문 게시판**은 궁금한 점을 자유롭게 질문하고 답변을 받는 공간입니다.\n\n### 💡 좋은 질문하는 법\n\n1. **검색 먼저** – 이미 같은 질문이 있는지 검색해보세요.\n2. **구체적으로** – 상황, 시도한 방법, 에러 메시지를 상세히 적어주세요.\n3. **제목을 명확하게** – `도와주세요`보다 `Node.js MySQL 연결 오류`가 좋습니다.\n4. **해결 후 공유** – 문제를 해결했다면 답변을 남겨주세요!\n\n### ✅ 예시\n\n```\n질문: Express 서버에서 CORS 에러가 발생합니다.\n\n상황: React 앱에서 localhost:3001 Express 서버로 요청 시\n에러 메시지: Access-Control-Allow-Origin\n\n시도: cors() 미들웨어를 추가했지만 여전히 에러가 납니다.\n```",
+        },
+        {
+          category_id: 3,
+          slug: "info",
+          title: "정보 게시판 이용 안내",
+          content:
+            "## 📢 유용한 정보를 공유해주세요!\n\n**정보 게시판**은 개발 팁, 기술 뉴스, 유틸리티 소개 등 유익한 정보를 공유하는 공간입니다.\n\n### 📝 정보 공유 가이드\n\n1. **출처 표기** – 인용이나 참고 자료는 반드시 출처를 남겨주세요.\n2. **검증된 정보** – 사실 여부가 확인된 정보를 공유해주세요.\n3. **카테고리 활용** – 관련 카테고리를 선택해주세요.\n4. **링크 삽입** – 참고 링크가 있다면 함께 첨부해주세요.\n\n> 예: `[MDN Web Docs](https://developer.mozilla.org/ko/)` → [MDN Web Docs](https://developer.mozilla.org/ko/)\n\n### 🖼 이미지 첨부\n\n마크다운 문법으로 이미지를 삽입할 수 있습니다:\n\n```markdown\n![설명](이미지_URL)\n```",
+        },
+        {
+          category_id: 4,
+          slug: "chat",
+          title: "잡담 게시판 이용 안내",
+          content:
+            "## 🗣 자유롭게 이야기 나눠요!\n\n**잡담 게시판**은 일상, 취미, 가벼운 이야기를 자유롭게 나누는 공간입니다.\n\n### 🎯 이런 이야기 좋아요!\n\n- 일상 생활 이야기\n- 개발자 밈 & 유머 😄\n- IT 업계 잡담\n- 음악, 영화, 게임 등 취미 이야기\n- 사는 이야기\n\n### ⚠️ 주의사항\n\n- 정치/종교 등 민감한 주제는 자제해주세요.\n- 타인에게 불쾌감을 줄 수 있는 내용은 삼가주세요.\n- 과도한 친목/구인 활동은 지양해주세요.\n\n---\n\n**편하게 이야기 나누며 쉬어가는 공간입니다!** ☕",
+        },
+      ];
+      notices.forEach((n) => {
+        db.query(
+          "SELECT id FROM posts WHERE title = ? AND user_id = ?",
+          [n.title, adminId],
+          (err, posts) => {
+            if (err || posts.length > 0) return;
+            db.query(
+              "INSERT INTO posts (user_id, title, content, category_id, is_pinned) VALUES (?, ?, ?, ?, 1)",
+              [adminId, n.title, n.content, n.category_id],
+              (err) => {
+                if (!err) console.log(`공지 등록 완료: ${n.title}`);
+              },
+            );
+          },
+        );
       });
-    });
-  });
+    },
+  );
 }
 
 function isAdminUser(username) {
@@ -290,45 +408,75 @@ app.post("/api/auth/signup", (req, res) => {
   if (name.length > 30)
     return res.status(400).json({ error: "닉네임은 30자 이내로 입력하세요" });
   if (!/^[가-힣a-zA-Z0-9_.-]+$/.test(name))
-    return res.status(400).json({ error: "닉네임은 한글, 영문, 숫자, _, ., -만 사용 가능합니다" });
+    return res
+      .status(400)
+      .json({ error: "닉네임은 한글, 영문, 숫자, _, ., -만 사용 가능합니다" });
 
   const emailRegex = /^[^\s@]+@bssm\.hs\.kr$/;
   if (!emailRegex.test(email.trim()))
-    return res.status(400).json({ error: "@bssm.hs.kr 이메일만 가입 가능합니다" });
+    return res
+      .status(400)
+      .json({ error: "@bssm.hs.kr 이메일만 가입 가능합니다" });
   const userEmail = email.trim().toLowerCase();
-  db.query("SELECT id, password_hash FROM users WHERE username = ?", [name], (err, users) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (users.length > 0 && users[0].password_hash)
-      return res.status(409).json({ error: "이미 가입된 닉네임입니다" });
-
-    db.query("SELECT id FROM users WHERE email = ?", [userEmail], (err, emailUsers) => {
+  db.query(
+    "SELECT id, password_hash FROM users WHERE username = ?",
+    [name],
+    (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
-      if (emailUsers.length > 0)
-        return res.status(409).json({ error: "이미 가입된 이메일입니다" });
+      if (users.length > 0 && users[0].password_hash)
+        return res.status(409).json({ error: "이미 가입된 닉네임입니다" });
 
-      bcrypt.hash(password, 10, (err, hash) => {
-        if (err) return res.status(500).json({ error: err.message });
-        const finish = (userId) => {
-          const isAdmin = isAdminUser(name);
-          const jwtToken = jwt.sign({ id: userId, username: name, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
-          res.status(201).json({ token: jwtToken, user: { id: userId, username: name, email: userEmail, isAdmin } });
-        };
-        if (users.length > 0) {
-          db.query("UPDATE users SET password_hash = ?, email = ? WHERE id = ?",
-            [hash, userEmail, users[0].id], (err) => {
+      db.query(
+        "SELECT id FROM users WHERE email = ?",
+        [userEmail],
+        (err, emailUsers) => {
+          if (err) return res.status(500).json({ error: err.message });
+          if (emailUsers.length > 0)
+            return res.status(409).json({ error: "이미 가입된 이메일입니다" });
+
+          bcrypt.hash(password, 10, (err, hash) => {
             if (err) return res.status(500).json({ error: err.message });
-            finish(users[0].id);
+            const finish = (userId) => {
+              const isAdmin = isAdminUser(name);
+              const jwtToken = jwt.sign(
+                { id: userId, username: name, isAdmin },
+                JWT_SECRET,
+                { expiresIn: "7d" },
+              );
+              res.status(201).json({
+                token: jwtToken,
+                user: {
+                  id: userId,
+                  username: name,
+                  email: userEmail,
+                  isAdmin,
+                },
+              });
+            };
+            if (users.length > 0) {
+              db.query(
+                "UPDATE users SET password_hash = ?, email = ? WHERE id = ?",
+                [hash, userEmail, users[0].id],
+                (err) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  finish(users[0].id);
+                },
+              );
+            } else {
+              db.query(
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                [name, hash, userEmail],
+                (err, result) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  finish(result.insertId);
+                },
+              );
+            }
           });
-        } else {
-          db.query("INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            [name, hash, userEmail], (err, result) => {
-            if (err) return res.status(500).json({ error: err.message });
-            finish(result.insertId);
-          });
-        }
-      });
-    });
-  });
+        },
+      );
+    },
+  );
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -344,35 +492,77 @@ app.post("/api/auth/login", (req, res) => {
     (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
       if (users.length === 0)
-        return res.status(401).json({ error: "닉네임 또는 비밀번호가 일치하지 않습니다" });
+        return res
+          .status(401)
+          .json({ error: "닉네임 또는 비밀번호가 일치하지 않습니다" });
       const user = users[0];
       if (!user.password_hash)
-        return res.status(401).json({ error: "비밀번호가 설정되지 않은 계정입니다. 회원가입을 진행해주세요" });
+        return res.status(401).json({
+          error: "비밀번호가 설정되지 않은 계정입니다. 회원가입을 진행해주세요",
+        });
       bcrypt.compare(password, user.password_hash, (err, match) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!match)
-          return res.status(401).json({ error: "닉네임 또는 비밀번호가 일치하지 않습니다" });
+          return res
+            .status(401)
+            .json({ error: "닉네임 또는 비밀번호가 일치하지 않습니다" });
         const isAdmin = isAdminUser(user.username);
-        const token = jwt.sign({ id: user.id, username: user.username, isAdmin }, JWT_SECRET, { expiresIn: "7d" });
-        res.json({ token, user: { id: user.id, username: user.username, email: user.email, isAdmin } });
+        const token = jwt.sign(
+          { id: user.id, username: user.username, isAdmin },
+          JWT_SECRET,
+          { expiresIn: "7d" },
+        );
+        res.json({
+          token,
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            isAdmin,
+          },
+        });
       });
-    }
+    },
   );
 });
 
 app.get("/api/auth/me", authenticate, (req, res) => {
   if (!req.user) return res.json({ user: null });
-  db.query("SELECT id, username, email, avatar, created_at FROM users WHERE id = ?", [req.user.id], (err, users) => {
-    if (err || users.length === 0) return res.json({ user: { id: req.user.id, username: req.user.username, email: null, avatar: null, isAdmin: req.user.isAdmin } });
-    res.json({ user: { id: users[0].id, username: users[0].username, email: users[0].email, avatar: users[0].avatar, isAdmin: req.user.isAdmin } });
-  });
+  db.query(
+    "SELECT id, username, email, avatar, created_at FROM users WHERE id = ?",
+    [req.user.id],
+    (err, users) => {
+      if (err || users.length === 0)
+        return res.json({
+          user: {
+            id: req.user.id,
+            username: req.user.username,
+            email: null,
+            avatar: null,
+            isAdmin: req.user.isAdmin,
+          },
+        });
+      res.json({
+        user: {
+          id: users[0].id,
+          username: users[0].username,
+          email: users[0].email,
+          avatar: users[0].avatar,
+          isAdmin: req.user.isAdmin,
+        },
+      });
+    },
+  );
 });
 
 app.get("/api/categories", (req, res) => {
-  db.query("SELECT id, name, slug FROM categories ORDER BY id ASC", (err, cats) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(cats);
-  });
+  db.query(
+    "SELECT id, name, slug FROM categories ORDER BY id ASC",
+    (err, cats) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(cats);
+    },
+  );
 });
 
 app.get("/api/posts", (req, res) => {
@@ -399,7 +589,8 @@ app.get("/api/posts", (req, res) => {
 
   let orderClause;
   if (sort === "popular") {
-    orderClause = "ORDER BY p.is_pinned DESC, like_count DESC, p.created_at DESC";
+    orderClause =
+      "ORDER BY p.is_pinned DESC, like_count DESC, p.created_at DESC";
   } else {
     orderClause = "ORDER BY p.is_pinned DESC, p.created_at DESC";
   }
@@ -431,7 +622,12 @@ app.get("/api/posts", (req, res) => {
     const total = countResult[0].total;
     db.query(dataSql, [...params, limit, offset], (err, posts) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ posts, total, page, totalPages: Math.ceil(total / limit) || 1 });
+      res.json({
+        posts,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit) || 1,
+      });
     });
   });
 });
@@ -442,7 +638,7 @@ app.get("/api/posts/:id", authenticate, (req, res) => {
     [req.params.id],
     (err) => {
       if (err) console.error("조회수 증가 실패:", err.message);
-    }
+    },
   );
 
   const postSql = `
@@ -476,19 +672,33 @@ app.get("/api/posts/:id", authenticate, (req, res) => {
     db.query(commentSql, [req.params.id], (err, comments) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      let hasLiked = false, hasBookmarked = false;
+      let hasLiked = false,
+        hasBookmarked = false;
       if (req.user) {
         (function check() {
-          db.query("SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?", [req.params.id, req.user.id], (err, likes) => {
-            if (!err) hasLiked = likes.length > 0;
-            db.query("SELECT id FROM bookmarks WHERE post_id = ? AND user_id = ?", [req.params.id, req.user.id], (err, bm) => {
-              if (!err) hasBookmarked = bm.length > 0;
-              res.json({ ...posts[0], comments, hasLiked, hasBookmarked });
-            });
-          });
+          db.query(
+            "SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?",
+            [req.params.id, req.user.id],
+            (err, likes) => {
+              if (!err) hasLiked = likes.length > 0;
+              db.query(
+                "SELECT id FROM bookmarks WHERE post_id = ? AND user_id = ?",
+                [req.params.id, req.user.id],
+                (err, bm) => {
+                  if (!err) hasBookmarked = bm.length > 0;
+                  res.json({ ...posts[0], comments, hasLiked, hasBookmarked });
+                },
+              );
+            },
+          );
         })();
       } else {
-        res.json({ ...posts[0], comments, hasLiked: false, hasBookmarked: false });
+        res.json({
+          ...posts[0],
+          comments,
+          hasLiked: false,
+          hasBookmarked: false,
+        });
       }
     });
   });
@@ -497,8 +707,7 @@ app.get("/api/posts/:id", authenticate, (req, res) => {
 app.post("/api/posts", authenticate, requireAuth, (req, res) => {
   const { title, content, category_id } = req.body;
   const cleanTitle = sanitize(title || "");
-  if (!cleanTitle)
-    return res.status(400).json({ error: "제목을 입력하세요" });
+  if (!cleanTitle) return res.status(400).json({ error: "제목을 입력하세요" });
   if (!content || !content.trim())
     return res.status(400).json({ error: "내용을 입력하세요" });
 
@@ -509,15 +718,14 @@ app.post("/api/posts", authenticate, requireAuth, (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       res.status(201).json({ id: result.insertId });
-    }
+    },
   );
 });
 
 app.put("/api/posts/:id", authenticate, requireAuth, (req, res) => {
   const { title, content, category_id } = req.body;
   const cleanTitle = sanitize(title || "");
-  if (!cleanTitle)
-    return res.status(400).json({ error: "제목을 입력하세요" });
+  if (!cleanTitle) return res.status(400).json({ error: "제목을 입력하세요" });
   if (!content || !content.trim())
     return res.status(400).json({ error: "내용을 입력하세요" });
 
@@ -532,12 +740,15 @@ app.put("/api/posts/:id", authenticate, requireAuth, (req, res) => {
       if (!canModifyPost(post, req.user))
         return res.status(403).json({ error: "작성자만 수정할 수 있습니다" });
       const catId = category_id ? parseInt(category_id) : null;
-      db.query("UPDATE posts SET title = ?, content = ?, category_id = ? WHERE id = ?",
-        [cleanTitle, content.trim(), catId, req.params.id], (err) => {
+      db.query(
+        "UPDATE posts SET title = ?, content = ?, category_id = ? WHERE id = ?",
+        [cleanTitle, content.trim(), catId, req.params.id],
+        (err) => {
           if (err) return res.status(500).json({ error: err.message });
           res.json({ message: "수정 완료" });
-        });
-    }
+        },
+      );
+    },
   );
 });
 
@@ -556,7 +767,7 @@ app.delete("/api/posts/:id", authenticate, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "삭제 완료" });
       });
-    }
+    },
   );
 });
 
@@ -567,53 +778,87 @@ app.post("/api/posts/:id/like", authenticate, requireAuth, (req, res) => {
     (err, likes) => {
       if (err) return res.status(500).json({ error: err.message });
       if (likes.length > 0) {
-        db.query("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?",
-          [req.params.id, req.user.id], (err) => {
+        db.query(
+          "DELETE FROM post_likes WHERE post_id = ? AND user_id = ?",
+          [req.params.id, req.user.id],
+          (err) => {
             if (err) return res.status(500).json({ error: err.message });
-            db.query("SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = ?", [req.params.id], (err, result) => {
-              if (err) return res.status(500).json({ error: err.message });
-              res.json({ liked: false, likeCount: result[0].cnt });
-            });
-          });
+            db.query(
+              "SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = ?",
+              [req.params.id],
+              (err, result) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ liked: false, likeCount: result[0].cnt });
+              },
+            );
+          },
+        );
       } else {
-        db.query("INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)",
-          [req.params.id, req.user.id], (err) => {
+        db.query(
+          "INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)",
+          [req.params.id, req.user.id],
+          (err) => {
             if (err) return res.status(500).json({ error: err.message });
-            db.query("SELECT user_id FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
-              if (!err && posts.length > 0 && posts[0].user_id !== req.user.id) {
-                const notifMsg = `${req.user.username}님이 회원님의 게시글을 좋아합니다.`;
-                db.query(
-                  "INSERT INTO notifications (user_id, type, message, related_user_id, related_post_id) VALUES (?, 'like', ?, ?, ?)",
-                  [posts[0].user_id, notifMsg, req.user.id, req.params.id],
-                  (err2) => {
-                    if (!err2 && io) io.to(`user:${posts[0].user_id}`).emit("new-notification", { type: "like", message: notifMsg });
-                  }
-                );
-              }
-            });
-            db.query("SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = ?", [req.params.id], (err, result) => {
-              if (err) return res.status(500).json({ error: err.message });
-              res.json({ liked: true, likeCount: result[0].cnt });
-            });
-          });
+            db.query(
+              "SELECT user_id FROM posts WHERE id = ?",
+              [req.params.id],
+              (err, posts) => {
+                if (
+                  !err &&
+                  posts.length > 0 &&
+                  posts[0].user_id !== req.user.id
+                ) {
+                  const notifMsg = `${req.user.username}님이 회원님의 게시글을 좋아합니다.`;
+                  db.query(
+                    "INSERT INTO notifications (user_id, type, message, related_user_id, related_post_id) VALUES (?, 'like', ?, ?, ?)",
+                    [posts[0].user_id, notifMsg, req.user.id, req.params.id],
+                    (err2) => {
+                      if (!err2 && io)
+                        io.to(`user:${posts[0].user_id}`).emit(
+                          "new-notification",
+                          { type: "like", message: notifMsg },
+                        );
+                    },
+                  );
+                }
+              },
+            );
+            db.query(
+              "SELECT COUNT(*) AS cnt FROM post_likes WHERE post_id = ?",
+              [req.params.id],
+              (err, result) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ liked: true, likeCount: result[0].cnt });
+              },
+            );
+          },
+        );
       }
-    }
+    },
   );
 });
 
 app.put("/api/posts/:id/pin", authenticate, (req, res) => {
   if (!req.user || !isAdminUser(req.user.username))
     return res.status(403).json({ error: "관리자만 고정할 수 있습니다" });
-  db.query("SELECT id, is_pinned FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (posts.length === 0)
-      return res.status(404).json({ error: "게시글을 찾을 수 없습니다" });
-    const newPinned = posts[0].is_pinned ? 0 : 1;
-    db.query("UPDATE posts SET is_pinned = ? WHERE id = ?", [newPinned, req.params.id], (err) => {
+  db.query(
+    "SELECT id, is_pinned FROM posts WHERE id = ?",
+    [req.params.id],
+    (err, posts) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ is_pinned: !!newPinned });
-    });
-  });
+      if (posts.length === 0)
+        return res.status(404).json({ error: "게시글을 찾을 수 없습니다" });
+      const newPinned = posts[0].is_pinned ? 0 : 1;
+      db.query(
+        "UPDATE posts SET is_pinned = ? WHERE id = ?",
+        [newPinned, req.params.id],
+        (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ is_pinned: !!newPinned });
+        },
+      );
+    },
+  );
 });
 
 app.get("/api/users/:username/posts", (req, res) => {
@@ -648,7 +893,13 @@ app.get("/api/users/:username/posts", (req, res) => {
     const total = countResult[0].total;
     db.query(dataSql, [req.params.username, limit, offset], (err, posts) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ posts, total, page, totalPages: Math.ceil(total / limit) || 1, username: req.params.username });
+      res.json({
+        posts,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit) || 1,
+        username: req.params.username,
+      });
     });
   });
 });
@@ -664,20 +915,25 @@ app.get("/api/users/:username", authenticate, (req, res) => {
       const targetId = users[0].id;
       db.query(
         "SELECT COUNT(*) AS post_count FROM posts WHERE user_id = ?",
-        [targetId], (err, postResult) => {
+        [targetId],
+        (err, postResult) => {
           if (err) return res.status(500).json({ error: err.message });
           db.query(
             "SELECT COUNT(*) AS comment_count FROM comments WHERE user_id = ?",
-            [targetId], (err, commentResult) => {
+            [targetId],
+            (err, commentResult) => {
               if (err) return res.status(500).json({ error: err.message });
               db.query(
                 "SELECT COUNT(*) AS follower_count FROM follows WHERE following_id = ?",
-                [targetId], (err, followerResult) => {
+                [targetId],
+                (err, followerResult) => {
                   if (err) return res.status(500).json({ error: err.message });
                   db.query(
                     "SELECT COUNT(*) AS following_count FROM follows WHERE follower_id = ?",
-                    [targetId], (err, followingResult) => {
-                      if (err) return res.status(500).json({ error: err.message });
+                    [targetId],
+                    (err, followingResult) => {
+                      if (err)
+                        return res.status(500).json({ error: err.message });
                       let is_following = false;
                       let is_blocked = false;
                       if (req.user) {
@@ -695,15 +951,17 @@ app.get("/api/users/:username", authenticate, (req, res) => {
                                   ...users[0],
                                   post_count: postResult[0].post_count,
                                   comment_count: commentResult[0].comment_count,
-                                  follower_count: followerResult[0].follower_count,
-                                  following_count: followingResult[0].following_count,
+                                  follower_count:
+                                    followerResult[0].follower_count,
+                                  following_count:
+                                    followingResult[0].following_count,
                                   is_admin: isAdminUser(users[0].username),
                                   is_following,
                                   is_blocked,
                                 });
-                              }
+                              },
                             );
-                          }
+                          },
                         );
                       } else {
                         res.json({
@@ -717,11 +975,15 @@ app.get("/api/users/:username", authenticate, (req, res) => {
                           is_blocked: false,
                         });
                       }
-                    });
-                });
-            });
-        });
-    }
+                    },
+                  );
+                },
+              );
+            },
+          );
+        },
+      );
+    },
   );
 });
 
@@ -763,18 +1025,20 @@ app.get("/api/users/:username/comments", (req, res) => {
                 totalPages: Math.ceil(total / limit) || 1,
                 username: req.params.username,
               });
-            }
+            },
           );
-        }
+        },
       );
-    }
+    },
   );
 });
 
 app.put("/api/auth/password", authenticate, requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword)
-    return res.status(400).json({ error: "현재 비밀번호와 새 비밀번호를 입력하세요" });
+    return res
+      .status(400)
+      .json({ error: "현재 비밀번호와 새 비밀번호를 입력하세요" });
   if (newPassword.length < 4)
     return res.status(400).json({ error: "새 비밀번호는 4자 이상 입력하세요" });
 
@@ -784,22 +1048,30 @@ app.put("/api/auth/password", authenticate, requireAuth, (req, res) => {
     (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
       if (users.length === 0 || !users[0].password_hash)
-        return res.status(400).json({ error: "비밀번호가 설정되지 않은 계정입니다" });
+        return res
+          .status(400)
+          .json({ error: "비밀번호가 설정되지 않은 계정입니다" });
 
       bcrypt.compare(currentPassword, users[0].password_hash, (err, match) => {
         if (err) return res.status(500).json({ error: err.message });
         if (!match)
-          return res.status(403).json({ error: "현재 비밀번호가 일치하지 않습니다" });
+          return res
+            .status(403)
+            .json({ error: "현재 비밀번호가 일치하지 않습니다" });
 
         bcrypt.hash(newPassword, 10, (err, hash) => {
           if (err) return res.status(500).json({ error: err.message });
-          db.query("UPDATE users SET password_hash = ? WHERE id = ?", [hash, req.user.id], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ message: "비밀번호가 변경되었습니다" });
-          });
+          db.query(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            [hash, req.user.id],
+            (err) => {
+              if (err) return res.status(500).json({ error: err.message });
+              res.json({ message: "비밀번호가 변경되었습니다" });
+            },
+          );
         });
       });
-    }
+    },
   );
 });
 
@@ -816,20 +1088,35 @@ app.post("/api/posts/:id/comments", authenticate, requireAuth, (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       const commentId = result.insertId;
-      db.query("SELECT user_id FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
-        if (!err && posts.length > 0 && posts[0].user_id !== req.user.id) {
-          const notifMsg = `${req.user.username}님이 회원님의 게시글에 댓글을 남겼습니다.`;
-          db.query(
-            "INSERT INTO notifications (user_id, type, message, related_user_id, related_post_id, related_comment_id) VALUES (?, 'comment', ?, ?, ?, ?)",
-            [posts[0].user_id, notifMsg, req.user.id, req.params.id, commentId],
-            (err2) => {
-              if (!err2 && io) io.to(`user:${posts[0].user_id}`).emit("new-notification", { id: result.insertId, type: "comment", message: notifMsg });
-            }
-          );
-        }
-      });
+      db.query(
+        "SELECT user_id FROM posts WHERE id = ?",
+        [req.params.id],
+        (err, posts) => {
+          if (!err && posts.length > 0 && posts[0].user_id !== req.user.id) {
+            const notifMsg = `${req.user.username}님이 회원님의 게시글에 댓글을 남겼습니다.`;
+            db.query(
+              "INSERT INTO notifications (user_id, type, message, related_user_id, related_post_id, related_comment_id) VALUES (?, 'comment', ?, ?, ?, ?)",
+              [
+                posts[0].user_id,
+                notifMsg,
+                req.user.id,
+                req.params.id,
+                commentId,
+              ],
+              (err2) => {
+                if (!err2 && io)
+                  io.to(`user:${posts[0].user_id}`).emit("new-notification", {
+                    id: result.insertId,
+                    type: "comment",
+                    message: notifMsg,
+                  });
+              },
+            );
+          }
+        },
+      );
       res.status(201).json({ id: commentId });
-    }
+    },
   );
 });
 
@@ -848,34 +1135,55 @@ app.delete("/api/comments/:id", authenticate, (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: "댓글 삭제 완료" });
       });
-    }
+    },
   );
 });
 
-app.post("/api/users/:username/follow", authenticate, requireAuth, (req, res) => {
-  if (req.user.username === req.params.username)
-    return res.status(400).json({ error: "자신을 팔로우할 수 없습니다" });
-  db.query("SELECT id FROM users WHERE username = ?", [req.params.username], (err, users) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (users.length === 0)
-      return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
-    const targetId = users[0].id;
-    db.query("SELECT id FROM follows WHERE follower_id = ? AND following_id = ?", [req.user.id, targetId], (err, follows) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (follows.length > 0) {
-        db.query("DELETE FROM follows WHERE follower_id = ? AND following_id = ?", [req.user.id, targetId], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ following: false });
-        });
-      } else {
-        db.query("INSERT INTO follows (follower_id, following_id) VALUES (?, ?)", [req.user.id, targetId], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ following: true });
-        });
-      }
-    });
-  });
-});
+app.post(
+  "/api/users/:username/follow",
+  authenticate,
+  requireAuth,
+  (req, res) => {
+    if (req.user.username === req.params.username)
+      return res.status(400).json({ error: "자신을 팔로우할 수 없습니다" });
+    db.query(
+      "SELECT id FROM users WHERE username = ?",
+      [req.params.username],
+      (err, users) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (users.length === 0)
+          return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+        const targetId = users[0].id;
+        db.query(
+          "SELECT id FROM follows WHERE follower_id = ? AND following_id = ?",
+          [req.user.id, targetId],
+          (err, follows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (follows.length > 0) {
+              db.query(
+                "DELETE FROM follows WHERE follower_id = ? AND following_id = ?",
+                [req.user.id, targetId],
+                (err) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  res.json({ following: false });
+                },
+              );
+            } else {
+              db.query(
+                "INSERT INTO follows (follower_id, following_id) VALUES (?, ?)",
+                [req.user.id, targetId],
+                (err) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  res.json({ following: true });
+                },
+              );
+            }
+          },
+        );
+      },
+    );
+  },
+);
 
 app.delete("/api/users/:username", authenticate, requireAuth, (req, res) => {
   if (isAdminUser(req.user.username))
@@ -890,34 +1198,45 @@ app.delete("/api/users/:username", authenticate, requireAuth, (req, res) => {
 });
 
 app.post("/api/chat/rooms/:username", authenticate, requireAuth, (req, res) => {
-  db.query("SELECT id FROM users WHERE username = ?", [req.params.username], (err, users) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (users.length === 0) return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
-    const otherId = users[0].id;
-    if (req.user.id === otherId) return res.status(400).json({ error: "자기 자신과 채팅할 수 없습니다" });
+  db.query(
+    "SELECT id FROM users WHERE username = ?",
+    [req.params.username],
+    (err, users) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (users.length === 0)
+        return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+      const otherId = users[0].id;
+      if (req.user.id === otherId)
+        return res
+          .status(400)
+          .json({ error: "자기 자신과 채팅할 수 없습니다" });
 
-    db.query(
-      `SELECT r.id FROM chat_rooms r
+      db.query(
+        `SELECT r.id FROM chat_rooms r
        INNER JOIN chat_room_members m1 ON r.id = m1.room_id AND m1.user_id = ?
        INNER JOIN chat_room_members m2 ON r.id = m2.room_id AND m2.user_id = ?
        LIMIT 1`,
-      [req.user.id, otherId],
-      (err, rooms) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (rooms.length > 0) return res.json({ roomId: rooms[0].id });
-
-        db.query("INSERT INTO chat_rooms () VALUES ()", (err, result) => {
+        [req.user.id, otherId],
+        (err, rooms) => {
           if (err) return res.status(500).json({ error: err.message });
-          const roomId = result.insertId;
-          db.query("INSERT INTO chat_room_members (room_id, user_id) VALUES (?,?), (?,?)",
-            [roomId, req.user.id, roomId, otherId], (err) => {
-              if (err) return res.status(500).json({ error: err.message });
-              res.json({ roomId });
-            });
-        });
-      }
-    );
-  });
+          if (rooms.length > 0) return res.json({ roomId: rooms[0].id });
+
+          db.query("INSERT INTO chat_rooms () VALUES ()", (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            const roomId = result.insertId;
+            db.query(
+              "INSERT INTO chat_room_members (room_id, user_id) VALUES (?,?), (?,?)",
+              [roomId, req.user.id, roomId, otherId],
+              (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ roomId });
+              },
+            );
+          });
+        },
+      );
+    },
+  );
 });
 
 app.get("/api/chat/rooms", authenticate, requireAuth, (req, res) => {
@@ -935,89 +1254,118 @@ app.get("/api/chat/rooms", authenticate, requireAuth, (req, res) => {
     (err, rooms) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(rooms);
-    }
+    },
   );
 });
 
-app.get("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
-  const offset = (page - 1) * limit;
+app.get(
+  "/api/chat/rooms/:roomId/messages",
+  authenticate,
+  requireAuth,
+  (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
 
-  db.query(
-    "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
-    [req.params.roomId, req.user.id],
-    (err, members) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (members.length === 0) return res.status(403).json({ error: "채팅방 멤버가 아닙니다" });
+    db.query(
+      "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
+      [req.params.roomId, req.user.id],
+      (err, members) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (members.length === 0)
+          return res.status(403).json({ error: "채팅방 멤버가 아닙니다" });
 
-      db.query(
-        "SELECT COUNT(*) AS total FROM chat_messages WHERE room_id = ?",
-        [req.params.roomId], (err, countResult) => {
-          if (err) return res.status(500).json({ error: err.message });
-          const total = countResult[0].total;
+        db.query(
+          "SELECT COUNT(*) AS total FROM chat_messages WHERE room_id = ?",
+          [req.params.roomId],
+          (err, countResult) => {
+            if (err) return res.status(500).json({ error: err.message });
+            const total = countResult[0].total;
 
-          db.query(
-            `SELECT m.id, m.content, m.created_at, m.user_id, u.username
+            db.query(
+              `SELECT m.id, m.content, m.created_at, m.user_id, u.username
              FROM chat_messages m LEFT JOIN users u ON m.user_id = u.id
              WHERE m.room_id = ?
              ORDER BY m.created_at DESC
              LIMIT ? OFFSET ?`,
-            [req.params.roomId, limit, offset],
-            (err, messages) => {
-              if (err) return res.status(500).json({ error: err.message });
-              res.json({ messages, total, page, totalPages: Math.ceil(total / limit) || 1 });
-            }
-          );
-        }
-      );
-    }
-  );
-});
+              [req.params.roomId, limit, offset],
+              (err, messages) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({
+                  messages,
+                  total,
+                  page,
+                  totalPages: Math.ceil(total / limit) || 1,
+                });
+              },
+            );
+          },
+        );
+      },
+    );
+  },
+);
 
-app.post("/api/chat/rooms/:roomId/messages", authenticate, requireAuth, (req, res) => {
-  const { content } = req.body;
-  const cleanContent = sanitize(content || "");
-  if (!cleanContent)
-    return res.status(400).json({ error: "메시지를 입력하세요" });
+app.post(
+  "/api/chat/rooms/:roomId/messages",
+  authenticate,
+  requireAuth,
+  (req, res) => {
+    const { content } = req.body;
+    const cleanContent = sanitize(content || "");
+    if (!cleanContent)
+      return res.status(400).json({ error: "메시지를 입력하세요" });
 
-  db.query(
-    "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
-    [req.params.roomId, req.user.id],
-    (err, members) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (members.length === 0) return res.status(403).json({ error: "채팅방 멤버가 아닙니다" });
+    db.query(
+      "SELECT id FROM chat_room_members WHERE room_id = ? AND user_id = ?",
+      [req.params.roomId, req.user.id],
+      (err, members) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (members.length === 0)
+          return res.status(403).json({ error: "채팅방 멤버가 아닙니다" });
 
-      db.query(
-        "INSERT INTO chat_messages (room_id, user_id, content) VALUES (?, ?, ?)",
-        [req.params.roomId, req.user.id, cleanContent],
-        (err, result) => {
-          if (err) return res.status(500).json({ error: err.message });
-          const newMsg = { id: result.insertId, content: content.trim(), user_id: req.user.id, username: req.user.username, created_at: new Date() };
-          io.to(`room:${req.params.roomId}`).emit("new-message", newMsg);
-          db.query(
-            "SELECT user_id FROM chat_room_members WHERE room_id = ? AND user_id != ?",
-            [req.params.roomId, req.user.id],
-            (err, others) => {
-              if (!err && others.length > 0) {
-                const otherId = others[0].user_id;
-                const notifMsg = `${req.user.username}님이 메시지를 보냈습니다.`;
-                db.query(
-                  "INSERT INTO notifications (user_id, type, message, related_user_id, related_room_id) VALUES (?, 'chat', ?, ?, ?)",
-                  [otherId, notifMsg, req.user.id, req.params.roomId],
-                  (err2) => {
-                    if (!err2 && io) io.to(`user:${otherId}`).emit("new-notification", { type: "chat", message: notifMsg, related_room_id: parseInt(req.params.roomId) });
-                  }
-                );
-              }
-            }
-          );
-          res.status(201).json(newMsg);
-        }
-      );
-    }
-  );
-});
+        db.query(
+          "INSERT INTO chat_messages (room_id, user_id, content) VALUES (?, ?, ?)",
+          [req.params.roomId, req.user.id, cleanContent],
+          (err, result) => {
+            if (err) return res.status(500).json({ error: err.message });
+            const newMsg = {
+              id: result.insertId,
+              content: content.trim(),
+              user_id: req.user.id,
+              username: req.user.username,
+              created_at: new Date(),
+            };
+            io.to(`room:${req.params.roomId}`).emit("new-message", newMsg);
+            db.query(
+              "SELECT user_id FROM chat_room_members WHERE room_id = ? AND user_id != ?",
+              [req.params.roomId, req.user.id],
+              (err, others) => {
+                if (!err && others.length > 0) {
+                  const otherId = others[0].user_id;
+                  const notifMsg = `${req.user.username}님이 메시지를 보냈습니다.`;
+                  db.query(
+                    "INSERT INTO notifications (user_id, type, message, related_user_id, related_room_id) VALUES (?, 'chat', ?, ?, ?)",
+                    [otherId, notifMsg, req.user.id, req.params.roomId],
+                    (err2) => {
+                      if (!err2 && io)
+                        io.to(`user:${otherId}`).emit("new-notification", {
+                          type: "chat",
+                          message: notifMsg,
+                          related_room_id: parseInt(req.params.roomId),
+                        });
+                    },
+                  );
+                }
+              },
+            );
+            res.status(201).json(newMsg);
+          },
+        );
+      },
+    );
+  },
+);
 
 app.get("/api/notifications", authenticate, requireAuth, (req, res) => {
   const page = parseInt(req.query.page) || 1;
@@ -1025,7 +1373,8 @@ app.get("/api/notifications", authenticate, requireAuth, (req, res) => {
   const offset = (page - 1) * limit;
   db.query(
     "SELECT COUNT(*) AS total FROM notifications WHERE user_id = ?",
-    [req.user.id], (err, countResult) => {
+    [req.user.id],
+    (err, countResult) => {
       if (err) return res.status(500).json({ error: err.message });
       const total = countResult[0].total;
       db.query(
@@ -1033,46 +1382,78 @@ app.get("/api/notifications", authenticate, requireAuth, (req, res) => {
         [req.user.id, limit, offset],
         (err, notifs) => {
           if (err) return res.status(500).json({ error: err.message });
-          res.json({ notifications: notifs, total, page, totalPages: Math.ceil(total / limit) || 1 });
-        }
+          res.json({
+            notifications: notifs,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit) || 1,
+          });
+        },
       );
-    }
+    },
   );
 });
 
-app.get("/api/notifications/unread-count", authenticate, requireAuth, (req, res) => {
-  db.query("SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0", [req.user.id], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ count: result[0].cnt });
-  });
-});
+app.get(
+  "/api/notifications/unread-count",
+  authenticate,
+  requireAuth,
+  (req, res) => {
+    db.query(
+      "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0",
+      [req.user.id],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ count: result[0].cnt });
+      },
+    );
+  },
+);
 
 app.post("/api/notifications/read", authenticate, requireAuth, (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: "알림 ID가 필요합니다" });
-  db.query("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?", [id, req.user.id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
+  db.query(
+    "UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?",
+    [id, req.user.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    },
+  );
 });
 
-app.post("/api/notifications/read-all", authenticate, requireAuth, (req, res) => {
-  db.query("UPDATE notifications SET is_read = 1 WHERE user_id = ?", [req.user.id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
-});
+app.post(
+  "/api/notifications/read-all",
+  authenticate,
+  requireAuth,
+  (req, res) => {
+    db.query(
+      "UPDATE notifications SET is_read = 1 WHERE user_id = ?",
+      [req.user.id],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+      },
+    );
+  },
+);
 
 // ── Avatar Upload ──
 app.post("/api/upload/avatar", authenticate, requireAuth, (req, res) => {
   upload.single("avatar")(req, res, (err) => {
-    if (err) return res.status(400).json({ error: "업로드 오류: " + err.message });
+    if (err)
+      return res.status(400).json({ error: "업로드 오류: " + err.message });
     if (!req.file) return res.status(400).json({ error: "파일을 선택하세요" });
     const url = "/uploads/" + req.file.filename;
-    db.query("UPDATE users SET avatar = ? WHERE id = ?", [url, req.user.id], (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ avatar: url });
-    });
+    db.query(
+      "UPDATE users SET avatar = ? WHERE id = ?",
+      [url, req.user.id],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ avatar: url });
+      },
+    );
   });
 });
 
@@ -1086,46 +1467,83 @@ app.get("/api/tags", (req, res) => {
 
 app.post("/api/posts/:id/tags", authenticate, requireAuth, (req, res) => {
   const { tags } = req.body;
-  db.query("SELECT user_id FROM posts WHERE id = ?", [req.params.id], (err, posts) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (posts.length === 0) return res.status(404).json({ error: "게시글을 찾을 수 없습니다" });
-    if (!canModifyPost(posts[0], req.user)) return res.status(403).json({ error: "권한이 없습니다" });
-    db.query("DELETE FROM post_tags WHERE post_id = ?", [req.params.id], (err) => {
+  db.query(
+    "SELECT user_id FROM posts WHERE id = ?",
+    [req.params.id],
+    (err, posts) => {
       if (err) return res.status(500).json({ error: err.message });
-      const names = (tags || []).map(s => sanitize(s)).filter(s => s.length > 0 && s.length <= 30);
-      if (names.length === 0) return res.json({ tags: [] });
-      const placeholders = names.map(() => "(?)").join(",");
-      db.query(`INSERT IGNORE INTO tags (name) VALUES ${placeholders}`, names, (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        db.query("SELECT id, name FROM tags WHERE name IN (?)", [names], (err, tagRows) => {
+      if (posts.length === 0)
+        return res.status(404).json({ error: "게시글을 찾을 수 없습니다" });
+      if (!canModifyPost(posts[0], req.user))
+        return res.status(403).json({ error: "권한이 없습니다" });
+      db.query(
+        "DELETE FROM post_tags WHERE post_id = ?",
+        [req.params.id],
+        (err) => {
           if (err) return res.status(500).json({ error: err.message });
-          const vals = tagRows.map(t => [req.params.id, t.id]);
-          db.query("INSERT IGNORE INTO post_tags (post_id, tag_id) VALUES ?", [vals], (err) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ tags: tagRows.map(t => t.name) });
-          });
-        });
-      });
-    });
-  });
+          const names = (tags || [])
+            .map((s) => sanitize(s))
+            .filter((s) => s.length > 0 && s.length <= 30);
+          if (names.length === 0) return res.json({ tags: [] });
+          const placeholders = names.map(() => "(?)").join(",");
+          db.query(
+            `INSERT IGNORE INTO tags (name) VALUES ${placeholders}`,
+            names,
+            (err) => {
+              if (err) return res.status(500).json({ error: err.message });
+              db.query(
+                "SELECT id, name FROM tags WHERE name IN (?)",
+                [names],
+                (err, tagRows) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  const vals = tagRows.map((t) => [req.params.id, t.id]);
+                  db.query(
+                    "INSERT IGNORE INTO post_tags (post_id, tag_id) VALUES ?",
+                    [vals],
+                    (err) => {
+                      if (err)
+                        return res.status(500).json({ error: err.message });
+                      res.json({ tags: tagRows.map((t) => t.name) });
+                    },
+                  );
+                },
+              );
+            },
+          );
+        },
+      );
+    },
+  );
 });
 
 // ── Bookmarks ──
 app.post("/api/bookmarks/:postId", authenticate, requireAuth, (req, res) => {
-  db.query("SELECT id FROM bookmarks WHERE user_id = ? AND post_id = ?", [req.user.id, req.params.postId], (err, bm) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (bm.length > 0) {
-      db.query("DELETE FROM bookmarks WHERE user_id = ? AND post_id = ?", [req.user.id, req.params.postId], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ bookmarked: false });
-      });
-    } else {
-      db.query("INSERT INTO bookmarks (user_id, post_id) VALUES (?, ?)", [req.user.id, req.params.postId], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ bookmarked: true });
-      });
-    }
-  });
+  db.query(
+    "SELECT id FROM bookmarks WHERE user_id = ? AND post_id = ?",
+    [req.user.id, req.params.postId],
+    (err, bm) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (bm.length > 0) {
+        db.query(
+          "DELETE FROM bookmarks WHERE user_id = ? AND post_id = ?",
+          [req.user.id, req.params.postId],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ bookmarked: false });
+          },
+        );
+      } else {
+        db.query(
+          "INSERT INTO bookmarks (user_id, post_id) VALUES (?, ?)",
+          [req.user.id, req.params.postId],
+          (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ bookmarked: true });
+          },
+        );
+      }
+    },
+  );
 });
 
 app.get("/api/bookmarks", authenticate, requireAuth, (req, res) => {
@@ -1133,68 +1551,116 @@ app.get("/api/bookmarks", authenticate, requireAuth, (req, res) => {
   const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
   const offset = (page - 1) * limit;
   db.query(
-    `SELECT COUNT(*) AS total FROM bookmarks WHERE user_id = ?`, [req.user.id], (err, cnt) => {
+    `SELECT COUNT(*) AS total FROM bookmarks WHERE user_id = ?`,
+    [req.user.id],
+    (err, cnt) => {
       if (err) return res.status(500).json({ error: err.message });
       const total = cnt[0].total;
       db.query(
         `SELECT b.created_at AS bookmarked_at, p.id, p.title, p.created_at, u.username
          FROM bookmarks b JOIN posts p ON b.post_id = p.id LEFT JOIN users u ON p.user_id = u.id
          WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT ? OFFSET ?`,
-        [req.user.id, limit, offset], (err, rows) => {
+        [req.user.id, limit, offset],
+        (err, rows) => {
           if (err) return res.status(500).json({ error: err.message });
-          res.json({ bookmarks: rows, total, page, totalPages: Math.ceil(total / limit) || 1 });
-        }
+          res.json({
+            bookmarks: rows,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit) || 1,
+          });
+        },
       );
-    }
+    },
   );
 });
 
 // ── Reports ──
 app.post("/api/reports", authenticate, requireAuth, (req, res) => {
   const { target_type, target_id, reason } = req.body;
-  if (!target_type || !target_id || !reason) return res.status(400).json({ error: "신고 정보를 입력하세요" });
-  if (!["post", "comment"].includes(target_type)) return res.status(400).json({ error: "유효하지 않은 신고 대상입니다" });
+  if (!target_type || !target_id || !reason)
+    return res.status(400).json({ error: "신고 정보를 입력하세요" });
+  if (!["post", "comment"].includes(target_type))
+    return res.status(400).json({ error: "유효하지 않은 신고 대상입니다" });
   db.query(
     "INSERT INTO reports (user_id, target_type, target_id, reason) VALUES (?, ?, ?, ?)",
-    [req.user.id, target_type, target_id, reason.trim()], (err) => {
+    [req.user.id, target_type, target_id, reason.trim()],
+    (err) => {
       if (err) return res.status(500).json({ error: err.message });
       // notify admin
-      db.query("SELECT id FROM users WHERE username = ?", [ADMIN_USERNAME], (err, admins) => {
-        if (!err && admins.length > 0 && io) {
-          db.query("INSERT INTO notifications (user_id, type, message, related_user_id) VALUES (?, 'report', ?, ?)",
-            [admins[0].id, `${req.user.username}님이 ${target_type}을(를) 신고했습니다.`, req.user.id], (err2) => {
-              if (!err2) io.to(`user:${admins[0].id}`).emit("new-notification", { type: "report" });
-            });
-        }
-      });
+      db.query(
+        "SELECT id FROM users WHERE username = ?",
+        [ADMIN_USERNAME],
+        (err, admins) => {
+          if (!err && admins.length > 0 && io) {
+            db.query(
+              "INSERT INTO notifications (user_id, type, message, related_user_id) VALUES (?, 'report', ?, ?)",
+              [
+                admins[0].id,
+                `${req.user.username}님이 ${target_type}을(를) 신고했습니다.`,
+                req.user.id,
+              ],
+              (err2) => {
+                if (!err2)
+                  io.to(`user:${admins[0].id}`).emit("new-notification", {
+                    type: "report",
+                  });
+              },
+            );
+          }
+        },
+      );
       res.json({ message: "신고가 접수되었습니다." });
-    }
+    },
   );
 });
 
 // ── Block ──
-app.post("/api/users/:username/block", authenticate, requireAuth, (req, res) => {
-  if (req.user.username === req.params.username) return res.status(400).json({ error: "자신을 차단할 수 없습니다" });
-  db.query("SELECT id FROM users WHERE username = ?", [req.params.username], (err, users) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (users.length === 0) return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
-    const targetId = users[0].id;
-    db.query("SELECT id FROM blocks WHERE blocker_id = ? AND blocked_id = ?", [req.user.id, targetId], (err, blocks) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (blocks.length > 0) {
-        db.query("DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?", [req.user.id, targetId], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ blocked: false });
-        });
-      } else {
-        db.query("INSERT INTO blocks (blocker_id, blocked_id) VALUES (?, ?)", [req.user.id, targetId], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ blocked: true });
-        });
-      }
-    });
-  });
-});
+app.post(
+  "/api/users/:username/block",
+  authenticate,
+  requireAuth,
+  (req, res) => {
+    if (req.user.username === req.params.username)
+      return res.status(400).json({ error: "자신을 차단할 수 없습니다" });
+    db.query(
+      "SELECT id FROM users WHERE username = ?",
+      [req.params.username],
+      (err, users) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (users.length === 0)
+          return res.status(404).json({ error: "사용자를 찾을 수 없습니다" });
+        const targetId = users[0].id;
+        db.query(
+          "SELECT id FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+          [req.user.id, targetId],
+          (err, blocks) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (blocks.length > 0) {
+              db.query(
+                "DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?",
+                [req.user.id, targetId],
+                (err) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  res.json({ blocked: false });
+                },
+              );
+            } else {
+              db.query(
+                "INSERT INTO blocks (blocker_id, blocked_id) VALUES (?, ?)",
+                [req.user.id, targetId],
+                (err) => {
+                  if (err) return res.status(500).json({ error: err.message });
+                  res.json({ blocked: true });
+                },
+              );
+            }
+          },
+        );
+      },
+    );
+  },
+);
 
 io.use((socket, next) => {
   const token = socket.handshake.query.token;
@@ -1217,7 +1683,7 @@ io.on("connection", (socket) => {
         if (!err && members.length > 0) {
           socket.join(`room:${roomId}`);
         }
-      }
+      },
     );
   });
 

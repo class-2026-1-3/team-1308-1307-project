@@ -59,7 +59,9 @@ function updateHeader() {
   const notifBtn = document.getElementById("btn-notif");
   const bmBtn = document.getElementById("btn-bookmark-header");
   if (currentUser) {
-    usernameEl.innerHTML = avatarHtml(currentUser.avatar, currentUser.username, 28) + escHtml(currentUser.username);
+    usernameEl.innerHTML =
+      avatarHtml(currentUser.avatar, currentUser.username, 28) +
+      escHtml(currentUser.username);
     userArea.classList.remove("hidden");
     loginBtn.classList.add("hidden");
     chatBtn.classList.remove("hidden");
@@ -457,7 +459,8 @@ function signup() {
     return;
   }
   if (!/^[가-힣a-zA-Z0-9_.-]+$/.test(username)) {
-    errorEl.textContent = "닉네임은 한글, 영문, 숫자, _, ., -만 사용 가능합니다";
+    errorEl.textContent =
+      "닉네임은 한글, 영문, 숫자, _, ., -만 사용 가능합니다";
     errorEl.classList.remove("hidden");
     return;
   }
@@ -721,9 +724,10 @@ function hideAllViews() {
 
 function avatarHtml(url, username, size) {
   const s = size || 32;
-  if (url && url.startsWith("/uploads/")) return `<img src="${url}" class="avatar-img" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`;
+  if (url && url.startsWith("/uploads/"))
+    return `<img src="${url}" class="avatar-img" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`;
   const letter = username ? username.charAt(0).toUpperCase() : "?";
-  return `<span class="avatar-letter" style="display:inline-flex;align-items:center;justify-content:center;width:${s}px;height:${s}px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:${s*0.45}px;vertical-align:middle;margin-right:6px;flex-shrink:0;">${letter}</span>`;
+  return `<span class="avatar-letter" style="display:inline-flex;align-items:center;justify-content:center;width:${s}px;height:${s}px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:${s * 0.45}px;vertical-align:middle;margin-right:6px;flex-shrink:0;">${letter}</span>`;
 }
 
 function formatDate(str) {
@@ -797,7 +801,17 @@ function loadPosts(page) {
             ${avatarHtml(post.avatar, post.username, 20)}
             <span onclick="event.stopPropagation();showProfile('${escHtml(post.username)}')" class="username-link">${escHtml(post.username || "익명")}</span>
             ${post.category_name ? `<span class="category-label">${post.category_name}</span>` : ""}
-            ${post.tags ? post.tags.split(",").map(t => `<span class="tag-label">${escHtml(t.trim())}</span>`).join("") : ""}
+            ${
+              post.tags
+                ? post.tags
+                    .split(",")
+                    .map(
+                      (t) =>
+                        `<span class="tag-label">${escHtml(t.trim())}</span>`,
+                    )
+                    .join("")
+                : ""
+            }
             &nbsp;·&nbsp;${formatDate(post.created_at)}
             &nbsp;·&nbsp;조회 ${post.views}
             &nbsp;·&nbsp;👍 ${post.like_count}
@@ -865,7 +879,12 @@ function loadPost(id) {
   fetch(`/api/posts/${id}`)
     .then((r) => r.json())
     .then((post) => {
-      const hashtags = post.tags ? post.tags.split(",").map(t => escHtml(t.trim())).filter(Boolean) : [];
+      const hashtags = post.tags
+        ? post.tags
+            .split(",")
+            .map((t) => escHtml(t.trim()))
+            .filter(Boolean)
+        : [];
       detail.innerHTML = `
       <div class="post-card">
         <div class="post-card-title">${post.is_pinned ? '<span class="pin-badge">📌</span> ' : ""}${escHtml(post.title)}</div>
@@ -876,7 +895,7 @@ function loadPost(id) {
           ${post.category_name ? `<span class="category-label">${post.category_name}</span>` : ""}
           &nbsp;·&nbsp;${formatDate(post.created_at)}
           &nbsp;·&nbsp;조회 ${post.views}
-          ${hashtags.length ? `&nbsp;·&nbsp;${hashtags.map(t => `<span class="tag-label">${t}</span>`).join(" ")}` : ""}
+          ${hashtags.length ? `&nbsp;·&nbsp;${hashtags.map((t) => `<span class="tag-label">${t}</span>`).join(" ")}` : ""}
         </div>
         <div class="post-card-content md-content">${renderMd(post.content)}</div>
       </div>
@@ -884,20 +903,35 @@ function loadPost(id) {
 
       const cList = post.comments || [];
       document.getElementById("comment-count").textContent = cList.length;
-      const parents = cList.filter(c => !c.parent_id);
-      const children = cList.filter(c => c.parent_id);
-      comments.innerHTML = cList.length === 0
-        ? '<div class="empty">아직 댓글이 없습니다.</div>'
-        : parents.map(p => {
-            const replies = children.filter(c => c.parent_id === p.id);
-            return renderComment(p) + (replies.length ? replies.map(r => `<div class="comment-reply">${renderComment(r)}</div>`).join("") : "");
-          }).join("");
+      const parents = cList.filter((c) => !c.parent_id);
+      const children = cList.filter((c) => c.parent_id);
+      comments.innerHTML =
+        cList.length === 0
+          ? '<div class="empty">아직 댓글이 없습니다.</div>'
+          : parents
+              .map((p) => {
+                const replies = children.filter((c) => c.parent_id === p.id);
+                return (
+                  renderComment(p) +
+                  (replies.length
+                    ? replies
+                        .map(
+                          (r) =>
+                            `<div class="comment-reply">${renderComment(r)}</div>`,
+                        )
+                        .join("")
+                    : "")
+                );
+              })
+              .join("");
 
       document.getElementById("like-count").textContent = post.like_count || 0;
       const likeIcon = document.getElementById("like-icon");
       likeIcon.textContent = post.hasLiked ? "♥" : "♡";
       likeIcon.style.color = post.hasLiked ? "var(--red)" : "var(--text2)";
-      document.getElementById("btn-like").classList.toggle("liked", post.hasLiked);
+      document
+        .getElementById("btn-like")
+        .classList.toggle("liked", post.hasLiked);
 
       const bmIcon = document.getElementById("bookmark-icon");
       if (bmIcon) {
@@ -913,7 +947,10 @@ function loadPost(id) {
       }
       const editBtn = document.getElementById("btn-edit");
       const delBtn = document.getElementById("btn-delete");
-      if (currentUser && (currentUser.id === post.user_id || isCurrentUserAdmin())) {
+      if (
+        currentUser &&
+        (currentUser.id === post.user_id || isCurrentUserAdmin())
+      ) {
         editBtn.classList.remove("hidden");
         delBtn.classList.remove("hidden");
       } else {
@@ -966,7 +1003,8 @@ function togglePin() {
 }
 
 function renderComment(c) {
-  const canDel = currentUser && (currentUser.id === c.user_id || isCurrentUserAdmin());
+  const canDel =
+    currentUser && (currentUser.id === c.user_id || isCurrentUserAdmin());
   return `
 <div class="comment-item">
   <div class="comment-item-body">
@@ -1003,10 +1041,13 @@ function cancelReply() {
 }
 
 function toggleBookmark() {
-  if (!currentUser) { showAlertModal("로그인이 필요합니다"); return; }
+  if (!currentUser) {
+    showAlertModal("로그인이 필요합니다");
+    return;
+  }
   authFetch(`/api/bookmarks/${currentPostId}`, { method: "POST" })
-    .then(r => r.json())
-    .then(data => {
+    .then((r) => r.json())
+    .then((data) => {
       const icon = document.getElementById("bookmark-icon");
       icon.textContent = data.bookmarked ? "🔖" : "🏷️";
       showToast(data.bookmarked ? "북마크 추가" : "북마크 제거", "");
@@ -1015,15 +1056,22 @@ function toggleBookmark() {
 }
 
 function reportPost() {
-  if (!currentUser) { showAlertModal("로그인이 필요합니다"); return; }
-  showPromptModal("신고 사유를 입력하세요", "").then(reason => {
+  if (!currentUser) {
+    showAlertModal("로그인이 필요합니다");
+    return;
+  }
+  showPromptModal("신고 사유를 입력하세요", "").then((reason) => {
     if (!reason) return;
     authFetch("/api/reports", {
       method: "POST",
-      body: JSON.stringify({ target_type: "post", target_id: currentPostId, reason })
+      body: JSON.stringify({
+        target_type: "post",
+        target_id: currentPostId,
+        reason,
+      }),
     })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.error) return showAlertModal(data.error);
         showToast("신고가 접수되었습니다.", "success");
       })
@@ -1042,7 +1090,12 @@ function submitPost() {
   }
 
   const tagsInput = document.getElementById("write-tags");
-  const tags = tagsInput ? tagsInput.value.split(",").map(s => s.trim()).filter(Boolean) : [];
+  const tags = tagsInput
+    ? tagsInput.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
   localStorage.removeItem("draft_title");
   localStorage.removeItem("draft_content");
   authFetch("/api/posts", {
@@ -1059,7 +1112,10 @@ function submitPost() {
     })
     .then((data) => {
       if (tags.length) {
-        authFetch(`/api/posts/${data.id}/tags`, { method: "POST", body: JSON.stringify({ tags }) }).catch(() => {});
+        authFetch(`/api/posts/${data.id}/tags`, {
+          method: "POST",
+          body: JSON.stringify({ tags }),
+        }).catch(() => {});
       }
       showToast("게시글이 작성되었습니다.", "success");
       showDetail(data.id);
@@ -1082,7 +1138,12 @@ function updatePost() {
   }
 
   const tagsInput = document.getElementById("edit-tags");
-  const tags = tagsInput ? tagsInput.value.split(",").map(s => s.trim()).filter(Boolean) : [];
+  const tags = tagsInput
+    ? tagsInput.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
   authFetch(`/api/posts/${currentPostId}`, {
     method: "PUT",
     body: JSON.stringify({
@@ -1096,7 +1157,10 @@ function updatePost() {
       return r.json();
     })
     .then(() => {
-      authFetch(`/api/posts/${currentPostId}/tags`, { method: "POST", body: JSON.stringify({ tags }) }).catch(() => {});
+      authFetch(`/api/posts/${currentPostId}/tags`, {
+        method: "POST",
+        body: JSON.stringify({ tags }),
+      }).catch(() => {});
       showToast("게시글이 수정되었습니다.", "success");
       showDetail(currentPostId);
     })
@@ -1250,11 +1314,14 @@ function loadProfile(username) {
   authFetch(`/api/users/${encodeURIComponent(username)}`)
     .then((r) => r.json())
     .then((user) => {
-      const actionBtns = !isMyPage && currentUser ? `
+      const actionBtns =
+        !isMyPage && currentUser
+          ? `
         <button class="btn-follow ${user.is_following ? "following" : ""}" onclick="toggleFollow('${escHtml(user.username)}')">${user.is_following ? "팔로잉" : "팔로우"}</button>
         <button class="btn-chat-action" onclick="startChat('${escHtml(user.username)}')">💬 메시지</button>
         <button class="btn-chat-action" onclick="toggleBlock('${escHtml(user.username)}')" style="color:var(--red)">${user.is_blocked ? "✓ 차단 해제" : "🚫 차단"}</button>
-      ` : "";
+      `
+          : "";
 
       header.innerHTML = `
       <div class="profile-card">
@@ -1490,8 +1557,8 @@ function uploadAvatar() {
     const fd = new FormData();
     fd.append("avatar", file);
     authFetch("/api/upload/avatar", { method: "POST", body: fd })
-      .then(r => r.json())
-      .then(data => {
+      .then((r) => r.json())
+      .then((data) => {
         if (data.error) return showAlertModal(data.error);
         currentUser.avatar = data.avatar;
         updateHeader();
@@ -1505,14 +1572,21 @@ function uploadAvatar() {
 }
 
 function toggleBlock(username) {
-  if (!currentUser) { showAuthModal("login"); return; }
-  authFetch(`/api/users/${encodeURIComponent(username)}/block`, { method: "POST" })
-    .then(r => r.json())
-    .then(data => {
+  if (!currentUser) {
+    showAuthModal("login");
+    return;
+  }
+  authFetch(`/api/users/${encodeURIComponent(username)}/block`, {
+    method: "POST",
+  })
+    .then((r) => r.json())
+    .then((data) => {
       showToast(data.blocked ? "차단했습니다." : "차단 해제했습니다.", "");
       loadProfile(currentProfileUsername);
     })
-    .catch((err) => showAlertModal(typeof err === "string" ? err : "요청 실패"));
+    .catch((err) =>
+      showAlertModal(typeof err === "string" ? err : "요청 실패"),
+    );
 }
 
 async function deleteAccount() {
@@ -1785,7 +1859,10 @@ function loadNotifications() {
 }
 
 function showBookmarks() {
-  if (!currentUser) { showAuthModal("login"); return; }
+  if (!currentUser) {
+    showAuthModal("login");
+    return;
+  }
   hideAllViews();
   document.getElementById("view-bookmarks").classList.remove("hidden");
   loadBookmarks();
@@ -1797,20 +1874,25 @@ function loadBookmarks(page) {
   const p = page || 1;
   container.innerHTML = '<div class="loading">불러오는 중...</div>';
   authFetch(`/api/bookmarks?page=${p}&limit=10`)
-    .then(r => r.json())
-    .then(data => {
+    .then((r) => r.json())
+    .then((data) => {
       if (data.bookmarks.length === 0) {
-        container.innerHTML = '<div class="empty">북마크한 게시글이 없습니다.</div>';
+        container.innerHTML =
+          '<div class="empty">북마크한 게시글이 없습니다.</div>';
         return;
       }
-      container.innerHTML = data.bookmarks.map(b => `
+      container.innerHTML = data.bookmarks
+        .map(
+          (b) => `
         <div class="post-item" onclick="showDetail(${b.id})">
           <div>
             <div class="post-item-title">${escHtml(b.title)}</div>
             <div class="post-item-meta">${escHtml(b.username)} · 북마크 ${formatDate(b.bookmarked_at)}</div>
           </div>
         </div>
-      `).join("");
+      `,
+        )
+        .join("");
       const pDiv = document.getElementById("bookmarks-pagination");
       if (data.totalPages > 1) {
         let h = "";
@@ -1818,9 +1900,14 @@ function loadBookmarks(page) {
           h += `<button class="page-btn${i === p ? " active" : ""}" onclick="loadBookmarks(${i})">${i}</button>`;
         }
         pDiv.innerHTML = h;
-      } else { pDiv.innerHTML = ""; }
+      } else {
+        pDiv.innerHTML = "";
+      }
     })
-    .catch(() => { container.innerHTML = '<div class="empty error-msg">불러오지 못했습니다.</div>'; });
+    .catch(() => {
+      container.innerHTML =
+        '<div class="empty error-msg">불러오지 못했습니다.</div>';
+    });
 }
 
 function clickNotif(index) {

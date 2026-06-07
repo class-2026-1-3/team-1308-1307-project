@@ -25,7 +25,14 @@
         </div>
         <div class="header-actions">
           <div id="header-user" class="header-user hidden">
-            <button id="btn-dark" class="btn-icon" onclick="toggleDark()" title="다크모드">🌙</button>
+            <button
+              id="btn-dark"
+              class="btn-icon"
+              onclick="toggleDark()"
+              title="다크모드"
+            >
+              🌙
+            </button>
             <button
               id="btn-notif"
               class="btn-notif hidden"
@@ -34,7 +41,11 @@
               <span id="notif-bell">🔔</span>
               <span id="notif-badge" class="notif-badge hidden">0</span>
             </button>
-            <button class="btn-user" onclick="showMyPage()" style="display:flex;align-items:center;">
+            <button
+              class="btn-user"
+              onclick="showMyPage()"
+              style="display: flex; align-items: center"
+            >
               <span id="header-username"></span>
             </button>
             <span class="header-divider"></span>
@@ -308,7 +319,11 @@
           </div>
           <div class="form-group">
             <label>태그 (쉼표로 구분)</label>
-            <input type="text" id="write-tags" placeholder="예: 개발, 일상, 팁" />
+            <input
+              type="text"
+              id="write-tags"
+              placeholder="예: 개발, 일상, 팁"
+            />
           </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showList()">취소</button>
@@ -399,7 +414,11 @@
           </div>
           <div class="form-group">
             <label>태그 (쉼표로 구분)</label>
-            <input type="text" id="edit-tags" placeholder="예: 개발, 일상, 팁" />
+            <input
+              type="text"
+              id="edit-tags"
+              placeholder="예: 개발, 일상, 팁"
+            />
           </div>
           <div class="form-actions">
             <button class="btn-cancel" onclick="showDetail(currentPostId)">
@@ -419,10 +438,20 @@
             <button id="btn-pin" class="btn-pin hidden" onclick="togglePin()">
               📌 고정
             </button>
-            <button class="btn-edit hidden" id="btn-edit" onclick="showEdit(currentPostId)">
+            <button
+              class="btn-edit hidden"
+              id="btn-edit"
+              onclick="showEdit(currentPostId)"
+            >
               수정
             </button>
-            <button class="btn-delete hidden" id="btn-delete" onclick="deletePost()">삭제</button>
+            <button
+              class="btn-delete hidden"
+              id="btn-delete"
+              onclick="deletePost()"
+            >
+              삭제
+            </button>
           </div>
         </div>
         <div id="post-detail"></div>
@@ -431,10 +460,20 @@
             <span id="like-icon">♡</span>
             <span id="like-count">0</span>
           </button>
-          <button id="btn-bookmark" class="btn-like" onclick="toggleBookmark()" title="북마크">
+          <button
+            id="btn-bookmark"
+            class="btn-like"
+            onclick="toggleBookmark()"
+            title="북마크"
+          >
             <span id="bookmark-icon">🏷️</span>
           </button>
-          <button class="btn-like" onclick="reportPost()" title="신고" style="margin-left:auto;color:var(--text2);font-size:13px;">
+          <button
+            class="btn-like"
+            onclick="reportPost()"
+            title="신고"
+            style="margin-left: auto; color: var(--text2); font-size: 13px"
+          >
             🚨 신고
           </button>
         </div>
