@@ -725,7 +725,7 @@ function hideAllViews() {
 function avatarHtml(url, username, size) {
   const s = size || 32;
   if (url && url.startsWith("/uploads/"))
-    return `<img src="${url}" class="avatar-img" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">`;
+    return `<img src="${url}" class="avatar-img" style="width:${s}px;height:${s}px;border-radius:50%;object-fit:cover;vertical-align:middle;${s == 28 ? "margin-right:6px;" : ""}">`;
   const letter = username ? username.charAt(0).toUpperCase() : "?";
   return `<span class="avatar-letter" style="display:inline-flex;align-items:center;justify-content:center;width:${s}px;height:${s}px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:${s * 0.45}px;vertical-align:middle;margin-right:6px;flex-shrink:0;">${letter}</span>`;
 }

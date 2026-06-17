@@ -588,11 +588,21 @@ button:disabled {
   animation: slide-up 0.25s ease backwards;
 }
 
-.post-item:nth-child(1) { animation-delay: 0s; }
-.post-item:nth-child(2) { animation-delay: 0.03s; }
-.post-item:nth-child(3) { animation-delay: 0.06s; }
-.post-item:nth-child(4) { animation-delay: 0.09s; }
-.post-item:nth-child(5) { animation-delay: 0.12s; }
+.post-item:nth-child(1) {
+  animation-delay: 0s;
+}
+.post-item:nth-child(2) {
+  animation-delay: 0.03s;
+}
+.post-item:nth-child(3) {
+  animation-delay: 0.06s;
+}
+.post-item:nth-child(4) {
+  animation-delay: 0.09s;
+}
+.post-item:nth-child(5) {
+  animation-delay: 0.12s;
+}
 
 .post-item:hover {
   border-color: var(--accent);
@@ -1417,18 +1427,34 @@ input:disabled {
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modal-in {
-  from { opacity: 0; transform: scale(0.95) translateY(8px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 main:not(.hidden) {
@@ -1458,7 +1484,9 @@ main:not(.hidden) {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .empty {
