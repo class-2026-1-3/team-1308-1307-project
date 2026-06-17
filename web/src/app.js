@@ -814,7 +814,7 @@ function loadPosts(page) {
             }
             &nbsp;·&nbsp;${formatDate(post.created_at)}
             &nbsp;·&nbsp;조회 ${post.views}
-            &nbsp;·&nbsp;👍 ${post.like_count}
+            &nbsp;·&nbsp;❤️ ${post.like_count}
           </div>
         </div>
         <div class="post-item-right">
@@ -1408,7 +1408,7 @@ function loadProfilePosts(username, page) {
             ${post.category_name ? `<span class="category-label">${post.category_name}</span>` : ""}
             &nbsp;·&nbsp;${formatDate(post.created_at)}
             &nbsp;·&nbsp;조회 ${post.views}
-            &nbsp;·&nbsp;👍 ${post.like_count}
+            &nbsp;·&nbsp;❤️ ${post.like_count}
           </div>
         </div>
         <div class="post-item-right">
@@ -1841,7 +1841,7 @@ function loadNotifications() {
         .map(
           (n, i) => `
       <div class="notif-item ${n.is_read ? "" : "notif-unread"}" onclick="clickNotif(${i})">
-        <div class="notif-icon">${n.type === "comment" ? "💬" : n.type === "like" ? "👍" : "💬"}</div>
+        <div class="notif-icon">${n.type === "comment" ? "💬" : n.type === "like" ? "❤️" : "💬"}</div>
         <div class="notif-body">
           <div class="notif-msg">${escHtml(n.message)}</div>
           <div class="notif-time">${formatDate(n.created_at)}</div>
