@@ -15,6 +15,8 @@ BSSM Community BY 김세영, 김리원
 | **김세영** | 메인 개발 (서버/클라이언트 전반, API, DB 설계, 인프라) |
 | **김리원** | 디자인 (UI/UX, 스타일링, 반응형, Markdown 툴바) |
 
+<img width="1298" height="708" alt="스크린샷 2026-06-24 오후 5 16 12" src="https://github.com/user-attachments/assets/57006cc6-2dc3-4266-8816-7e36fd826c73" />
+
 ---
 
 ## 주요 기능
